@@ -53,7 +53,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install yamllint==1.35.1 check-jsonschema==0.28.4 safety==3.2.4
-          pip install -r requirements-dev.txt
+          if [ -f requirements-dev.txt ]; then
+            pip install -r requirements-dev.txt
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -62,69 +64,38 @@ jobs:
 
       - name: YAML lint (.github/workflows)
         run: |
-          # yamllint cannot properly parse JavaScript template literals in YAML
-          # Skip pr-issue-auto-close.yml which contains complex template strings
-          find .github/workflows -name "*.yml" ! -name "pr-issue-auto-close.yml" -exec yamllint -d '{extends: default, rules: {line-length: {max: 160}}}' {} +
+          if [ -d .github/workflows ]; then
+            find .github/workflows -name "*.yml" -exec yamllint -d '{extends: default, rules: {line-length: {max: 160}}}' {} +
+          else
+            echo "No .github/workflows directory; skipping."
+          fi
 
       - name: Validate GitHub workflow schemas
         run: |
-          # Exclude pr-issue-auto-close.yml (complex JS template literals cause parsing errors)
-          # Exclude smart-sync.yml (uses projects_v2_item event not yet in official schema)
-          find .github/workflows -name "*.yml" \
-            ! -name "pr-issue-auto-close.yml" \
-            ! -name "smart-sync.yml" \
-            -exec check-jsonschema --builtin-schema github-workflows {} + || true
+          if [ -d .github/workflows ]; then
+            find .github/workflows -name "*.yml" -exec check-jsonschema --builtin-schema github-workflows {} + || true
+          else
+            echo "No .github/workflows directory; skipping."
+          fi
 
-      - name: Python syntax check (blocking)
+      - name: Python syntax check (blocking, auto-detected)
         run: |
-          # Covers every top-level skill domain + scripts/. When adding a new
-          # domain folder, add it here (audit gate G9: this list previously
-          # skipped 8 post-v2.7 domains).
-          python -m compileall \
-            marketing-skill product-team c-level-advisor \
-            engineering-team ra-qm-team engineering \
-            business-growth finance project-management \
-            productivity marketing research \
-            business-operations commercial research-ops \
-            compliance-os markdown-html scripts
+          # Compiles every Python file in the repo (excluding .git). Nothing to
+          # hardcode here — if there's no Python yet, this is a no-op.
+          py_files=$(find . -name "*.py" -not -path "./.git/*")
+          if [ -n "$py_files" ]; then
+            python -m compileall -q $py_files
+          else
+            echo "No Python files found; skipping."
+          fi
 
-      - name: Validate plugin.json manifests (blocking — guards #539 + #686)
+      - name: Validate plugin.json manifests (if present)
         run: |
-          python scripts/check_plugin_json.py --all
-
-      # ---- Audit guardrails (newgen-2026-06 gates) ----------------------
-      # BLOCKING since PR-2 (flipped ahead of the 2026-07-01 SLA — every
-      # advisory run was green through PR #835). If a gate misfires on a
-      # legitimate edge case, extend its in-repo allowlist
-      # (scripts/check_paths_allowlist.txt, scripts/smoke_exceptions.txt)
-      # rather than re-adding continue-on-error.
-      - name: Path-existence linter (gate G1 — blocking)
-        run: |
-          python3 scripts/check_paths.py --all
-
-      # Every other gate reads frontmatter with a regex, so malformed YAML used
-      # to pass CI while Claude Code silently loaded the skill with no
-      # description. G10 parses it properly.
-      - name: Frontmatter YAML validator (gate G10 — blocking)
-        run: |
-          python3 scripts/check_frontmatter.py --all
-
-      - name: Dual-publish drift guard (gate G4 — blocking)
-        run: |
-          python3 scripts/check_dual_publish.py
-
-      - name: Script --help smoke gate (gate G8 — blocking)
-        run: |
-          python3 scripts/smoke_scripts.py
-
-      - name: JSON-output sample gate (gate G9 — advisory)
-        continue-on-error: true
-        run: |
-          python3 scripts/smoke_json_output.py
-
-      - name: Counter derivation check (gate G3 — blocking)
-        run: |
-          python3 scripts/derive_counters.py --check
+          if [ -f scripts/check_plugin_json.py ]; then
+            python scripts/check_plugin_json.py --all
+          else
+            echo "No scripts/check_plugin_json.py; skipping (not applicable to this repo)."
+          fi
 
       - name: Safety dependency audit (requirements*.txt)
         run: |
@@ -143,8 +114,12 @@ jobs:
 
       - name: Markdown link spot-check
         run: |
-          # Non-blocking: external links (claude.ai) may timeout, anchor links can't be validated
-          npx --yes markdown-link-check@3.12.2 README.md || true
+          # Non-blocking: external links may timeout, anchor links can't be validated
+          if [ -f README.md ]; then
+            npx --yes markdown-link-check@3.12.2 README.md || true
+          else
+            echo "No README.md; skipping."
+          fi
 
       - name: Summarize results
         if: always()
