@@ -48,6 +48,77 @@ jobs:
           name: posylochka-android-debug
           path: mobile-app/android/app/build/outputs/apk/debug/*.apk
 
+  android-release:
+    name: Android (signed release APK for RuStore / Google Play)
+    runs-on: ubuntu-latest
+    if: ${{ vars.HAS_ANDROID_SIGNING == 'true' }}
+    defaults:
+      run:
+        working-directory: mobile-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install JS deps
+        run: npm install
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Generate icons & splash screens
+        run: npx @capacitor/assets generate --android --iconBackgroundColor '#0A2472' --iconBackgroundColorDark '#0A2472' --splashBackgroundColor '#0A2472' --splashBackgroundColorDark '#0A2472'
+
+      - name: Sync web assets into native project
+        run: npx cap sync android
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Decode signing keystore
+        working-directory: mobile-app/android/app
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > release.keystore
+
+      - name: Add signing config to build.gradle
+        working-directory: mobile-app/android
+        run: |
+          cat >> app/build.gradle << 'EOF'
+
+          android {
+              signingConfigs {
+                  release {
+                      storeFile file("release.keystore")
+                      storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                      keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                      keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                  }
+              }
+          }
+          EOF
+
+      - name: Build signed release APK
+        working-directory: mobile-app/android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Upload signed release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: posylochka-android-release-signed
+          path: mobile-app/android/app/build/outputs/apk/release/*.apk
+
   ios:
     name: iOS (simulator build check)
     runs-on: macos-latest
