@@ -1,0 +1,25 @@
+{
+  "appId": "ru.posylochka.app",
+  "appName": "Посылочка",
+  "webDir": "www",
+  "server": {
+    "url": "https://xn----8sb3addmbbgv2e2b8b.xn--p1ai",
+    "cleartext": false,
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "backgroundColor": "#0A2472",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0A2472"
+    }
+  }
+}

@@ -1,0 +1,86 @@
+name: Mobile App Build (Android / iOS)
+
+'on':
+  push:
+    paths:
+      - 'mobile-app/**'
+      - '.github/workflows/mobile-build.yml'
+  workflow_dispatch: {}
+
+jobs:
+  android:
+    name: Android (debug APK)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install JS deps
+        run: npm install
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Generate icons & splash screens
+        run: npx @capacitor/assets generate --android --iconBackgroundColor '#0A2472' --iconBackgroundColorDark '#0A2472' --splashBackgroundColor '#0A2472' --splashBackgroundColorDark '#0A2472'
+
+      - name: Sync web assets into native project
+        run: npx cap sync android
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build debug APK
+        working-directory: mobile-app/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: posylochka-android-debug
+          path: mobile-app/android/app/build/outputs/apk/debug/*.apk
+
+  ios:
+    name: iOS (simulator build check)
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: mobile-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install JS deps
+        run: npm install
+
+      - name: Add iOS platform
+        run: npx cap add ios
+
+      - name: Generate icons & splash screens
+        run: npx @capacitor/assets generate --ios --iconBackgroundColor '#0A2472' --splashBackgroundColor '#0A2472'
+
+      - name: Sync web assets into native project
+        run: npx cap sync ios
+
+      - name: Install CocoaPods dependencies
+        working-directory: mobile-app/ios/App
+        run: pod install
+
+      - name: Build for iOS Simulator (unsigned, validates the project compiles)
+        working-directory: mobile-app/ios/App
+        run: |
+          xcodebuild -workspace App.xcworkspace -scheme App \
+            -sdk iphonesimulator -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build
