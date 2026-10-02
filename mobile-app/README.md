@@ -79,6 +79,33 @@ mobile-app/
    подписи и Provisioning Profile, затем через Xcode (`npx cap open ios`)
    соберите и загрузите билд в App Store Connect.
 
+## Готовая подписанная сборка для RuStore (уже настроено, нужно включить)
+
+В CI есть job `android-release`, который сам собирает **подписанный release APK**,
+готовый к загрузке в RuStore — ключ подписи уже сгенерирован, его файл и пароли
+я прислал вам отдельным файлом в чате (`KEYSTORE_SECRETS.txt` и `.keystore`).
+
+**Сохраните эти два файла в надёжном месте (менеджер паролей, зашифрованный архив) —
+без ключа вы не сможете выпустить ни одно обновление приложения ни в RuStore, ни
+в Google Play.**
+
+Чтобы включить сборку:
+
+1. На GitHub откройте репозиторий → **Settings → Secrets and variables → Actions**.
+2. Вкладка **Secrets** → **New repository secret**, добавьте четыре секрета
+   (значения — из присланного файла `KEYSTORE_SECRETS.txt`):
+   - `ANDROID_KEYSTORE_BASE64` — содержимое файла `posylochka-release.keystore.b64`
+     (вставить текст целиком)
+   - `ANDROID_KEYSTORE_PASSWORD`
+   - `ANDROID_KEY_ALIAS`
+   - `ANDROID_KEY_PASSWORD`
+3. Вкладка **Variables** → **New repository variable**: имя `HAS_ANDROID_SIGNING`,
+   значение `true`.
+4. Перейдите во вкладку **Actions** → workflow **Mobile App Build** → **Run workflow**
+   (или просто дождитесь следующего изменения в `mobile-app/`).
+5. После завершения сборки в Artifacts появится `posylochka-android-release-signed` —
+   это и есть файл для загрузки в RuStore (и в Google Play, после получения аккаунта).
+
 ## Как собрать release для Android самостоятельно
 
 На своём компьютере (с установленным Node.js и Android Studio):
