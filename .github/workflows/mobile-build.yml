@@ -33,10 +33,10 @@ jobs:
         run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android.keystore
 
       - name: Install a fresh Android SDK (cmdline-tools) for Bubblewrap
+        shell: bash
         run: |
-          set +e
-          {
-            set -e
+          set -o pipefail
+          ( set -ex
             SDK_ROOT="$HOME/android-sdk"
             mkdir -p "$SDK_ROOT/cmdline-tools"
             cd "$SDK_ROOT/cmdline-tools"
@@ -48,14 +48,7 @@ jobs:
             "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK_ROOT" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
             echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
             echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
-          } > sdk-install.log 2>&1
-          code=$?
-          cat sdk-install.log
-          if [ $code -ne 0 ]; then
-            msg=$(tail -c 3000 sdk-install.log | sed 's/%/%25/g; s/\r/%0D/g' | tr '\n' ' ')
-            echo "::error::$msg"
-            exit $code
-          fi
+          ) 2>&1 | tee sdk-install.log
 
       - name: Point Bubblewrap at the JDK/Android SDK (skip interactive setup)
         run: |
@@ -72,19 +65,31 @@ jobs:
           cat ~/.bubblewrap/config.json
 
       - name: Build signed TWA APK with Bubblewrap
+        shell: bash
         env:
           BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          set +e
-          npx @bubblewrap/cli build --skipPwaValidation > build.log 2>&1
-          code=$?
-          cat build.log
-          if [ $code -ne 0 ]; then
-            msg=$(tail -c 3000 build.log | sed 's/%/%25/g; s/\r/%0D/g' | tr '\n' ' ')
-            echo "::error::$msg"
-            exit $code
-          fi
+          set -o pipefail
+          npx @bubblewrap/cli build --skipPwaValidation 2>&1 | tee build.log
+
+      - name: Publish logs to a GitHub Release (always, for debugging)
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          : > combined-logs.txt
+          for f in sdk-install.log build.log; do
+            if [ -f "$f" ]; then
+              echo "===== $f =====" >> combined-logs.txt
+              cat "$f" >> combined-logs.txt
+            fi
+          done
+          gh release delete build-logs --yes --cleanup-tag || true
+          gh release create build-logs combined-logs.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Логи последней сборки (для отладки)" \
+            --notes "Служебный файл для отладки сборки." || true
 
       - name: Publish APK to a public GitHub Release (no login needed to download)
         env:
