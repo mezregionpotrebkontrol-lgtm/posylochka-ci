@@ -72,7 +72,7 @@ jobs:
           BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -o pipefail
-          npx @bubblewrap/cli build --skipPwaValidation 2>&1 | tee build.log
+          yes | npx @bubblewrap/cli build --skipPwaValidation 2>&1 | tee build.log
 
       - name: Publish logs to a GitHub Release (always, for debugging)
         if: always()
