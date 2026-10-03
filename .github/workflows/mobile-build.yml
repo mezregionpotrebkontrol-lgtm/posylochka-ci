@@ -29,21 +29,20 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
-
       - name: Decode signing keystore
         run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android.keystore
 
       - name: Point Bubblewrap at the preinstalled JDK/Android SDK (skip interactive setup)
         run: |
+          SDK_PATH="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
           echo "JAVA_HOME=$JAVA_HOME"
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          echo "Using Android SDK at: $SDK_PATH"
+          ls "$SDK_PATH" || echo "(path listing failed)"
           mkdir -p ~/.bubblewrap
           cat > ~/.bubblewrap/config.json << EOF
           {
             "jdkPath": "${JAVA_HOME}",
-            "androidSdkPath": "${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+            "androidSdkPath": "${SDK_PATH}"
           }
           EOF
           cat ~/.bubblewrap/config.json
