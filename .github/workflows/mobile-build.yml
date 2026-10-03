@@ -8,9 +8,10 @@ name: Mobile App Build (Android / iOS)
   workflow_dispatch: {}
 
 jobs:
-  android:
-    name: Android (debug APK)
+  android-twa:
+    name: Android (TWA — real Chrome rendering, for RuStore / Google Play)
     runs-on: ubuntu-latest
+    if: ${{ vars.HAS_ANDROID_SIGNING == 'true' }}
     permissions:
       contents: write
     defaults:
@@ -23,115 +24,49 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install JS deps
-        run: npm install
-
-      - name: Add Android platform
-        run: npx cap add android
-
-      - name: Generate icons & splash screens
-        run: npx @capacitor/assets generate --android --iconBackgroundColor '#0A2472' --iconBackgroundColorDark '#0A2472' --splashBackgroundColor '#0A2472' --splashBackgroundColorDark '#0A2472'
-
-      - name: Sync web assets into native project
-        run: npx cap sync android
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Build debug APK
-        working-directory: mobile-app/android
-        run: ./gradlew assembleDebug --no-daemon
-
-      - name: Publish APK to a public GitHub Release (no login needed to download)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          apk=$(find android/app/build/outputs/apk/debug -name '*.apk' | head -1)
-          cp "$apk" posylochka-debug-latest.apk
-          gh release delete latest-build --yes --cleanup-tag || true
-          gh release create latest-build posylochka-debug-latest.apk \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "Последняя тестовая сборка (debug)" \
-            --notes "Автоматическая сборка для тестирования на телефоне. Скачайте файл posylochka-debug-latest.apk ниже и установите его (не требует входа в GitHub)."
-
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: posylochka-android-debug
-          path: mobile-app/android/app/build/outputs/apk/debug/*.apk
-
-  android-release:
-    name: Android (signed release APK for RuStore / Google Play)
-    runs-on: ubuntu-latest
-    if: ${{ vars.HAS_ANDROID_SIGNING == 'true' }}
-    defaults:
-      run:
-        working-directory: mobile-app
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install JS deps
-        run: npm install
-
-      - name: Add Android platform
-        run: npx cap add android
-
-      - name: Generate icons & splash screens
-        run: npx @capacitor/assets generate --android --iconBackgroundColor '#0A2472' --iconBackgroundColorDark '#0A2472' --splashBackgroundColor '#0A2472' --splashBackgroundColorDark '#0A2472'
-
-      - name: Sync web assets into native project
-        run: npx cap sync android
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Decode signing keystore
-        working-directory: mobile-app/android/app
-        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > release.keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android.keystore
 
-      - name: Add signing config to build.gradle
-        working-directory: mobile-app/android
+      - name: Point Bubblewrap at the preinstalled JDK/Android SDK (skip interactive setup)
         run: |
-          cat >> app/build.gradle << 'EOF'
-
-          android {
-              signingConfigs {
-                  release {
-                      storeFile file("release.keystore")
-                      storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
-                      keyAlias System.getenv("ANDROID_KEY_ALIAS")
-                      keyPassword System.getenv("ANDROID_KEY_PASSWORD")
-                  }
-              }
-              buildTypes {
-                  release {
-                      signingConfig signingConfigs.release
-                  }
-              }
+          mkdir -p ~/.bubblewrap
+          cat > ~/.bubblewrap/config.json << EOF
+          {
+            "jdkPath": "${JAVA_HOME}",
+            "androidSdkPath": "${ANDROID_HOME}"
           }
           EOF
 
-      - name: Build signed release APK
-        working-directory: mobile-app/android
+      - name: Build signed TWA APK with Bubblewrap
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew assembleRelease --no-daemon
+        run: |
+          npx @bubblewrap/cli build --skipPwaValidation \
+            --password="$ANDROID_KEYSTORE_PASSWORD" \
+            --keyPassword="$ANDROID_KEY_PASSWORD"
 
-      - name: Upload signed release APK
+      - name: Publish APK to a public GitHub Release (no login needed to download)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp app-release-signed.apk posylochka-latest.apk
+          gh release delete latest-build --yes --cleanup-tag || true
+          gh release create latest-build posylochka-latest.apk \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Последняя сборка приложения (TWA)" \
+            --notes "Скачайте posylochka-latest.apk и установите на Android-телефон. Открывает сайт в полноценном Chrome внутри приложения — без лишнего масштабирования."
+
+      - name: Upload signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: posylochka-android-release-signed
-          path: mobile-app/android/app/build/outputs/apk/release/*.apk
+          name: posylochka-android-twa-signed
+          path: mobile-app/app-release-signed.apk
 
   ios:
     name: iOS (simulator build check)

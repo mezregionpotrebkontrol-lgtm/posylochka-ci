@@ -1,0 +1,28 @@
+{
+  "packageId": "ru.posylochka.app",
+  "host": "xn----8sb3addmbbgv2e2b8b.xn--p1ai",
+  "name": "Посылочка",
+  "launcherName": "Посылочка",
+  "display": "standalone",
+  "themeColor": "#0A2472",
+  "navigationColor": "#0A2472",
+  "navigationColorDark": "#0A2472",
+  "navigationDividerColor": "#0A2472",
+  "backgroundColor": "#0A2472",
+  "enableNotifications": false,
+  "startUrl": "/?source=pwa",
+  "iconUrl": "https://xn----8sb3addmbbgv2e2b8b.xn--p1ai/icons/icon-512.png",
+  "maskableIconUrl": "https://xn----8sb3addmbbgv2e2b8b.xn--p1ai/icons/icon-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "posylochka"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://xn----8sb3addmbbgv2e2b8b.xn--p1ai/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {}
+}
