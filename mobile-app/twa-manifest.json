@@ -18,8 +18,8 @@
     "path": "./android.keystore",
     "alias": "posylochka"
   },
-  "appVersionName": "1.0.0",
-  "appVersionCode": 1,
+  "appVersionName": "1.0.1",
+  "appVersionCode": 2,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://xn----8sb3addmbbgv2e2b8b.xn--p1ai/manifest.webmanifest",
