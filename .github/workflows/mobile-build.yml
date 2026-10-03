@@ -44,12 +44,9 @@ jobs:
 
       - name: Build signed TWA APK with Bubblewrap
         env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          npx @bubblewrap/cli build --skipPwaValidation \
-            --password="$ANDROID_KEYSTORE_PASSWORD" \
-            --keyPassword="$ANDROID_KEY_PASSWORD"
+          BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: npx @bubblewrap/cli build --skipPwaValidation
 
       - name: Publish APK to a public GitHub Release (no login needed to download)
         env:
