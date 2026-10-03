@@ -32,17 +32,41 @@ jobs:
       - name: Decode signing keystore
         run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android.keystore
 
-      - name: Point Bubblewrap at the preinstalled JDK/Android SDK (skip interactive setup)
+      - name: Install a fresh Android SDK (cmdline-tools) for Bubblewrap
         run: |
-          SDK_PATH="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          set +e
+          {
+            set -e
+            SDK_ROOT="$HOME/android-sdk"
+            mkdir -p "$SDK_ROOT/cmdline-tools"
+            cd "$SDK_ROOT/cmdline-tools"
+            curl -sS -o cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+            unzip -q cmdline-tools.zip
+            mv cmdline-tools latest
+            rm cmdline-tools.zip
+            yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK_ROOT" --licenses
+            "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK_ROOT" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+            echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+            echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          } > sdk-install.log 2>&1
+          code=$?
+          cat sdk-install.log
+          if [ $code -ne 0 ]; then
+            msg=$(tail -c 3000 sdk-install.log | sed 's/%/%25/g; s/\r/%0D/g' | tr '\n' ' ')
+            echo "::error::$msg"
+            exit $code
+          fi
+
+      - name: Point Bubblewrap at the JDK/Android SDK (skip interactive setup)
+        run: |
           echo "JAVA_HOME=$JAVA_HOME"
-          echo "Using Android SDK at: $SDK_PATH"
-          ls "$SDK_PATH" || echo "(path listing failed)"
+          echo "Using Android SDK at: $ANDROID_HOME"
+          ls "$ANDROID_HOME"
           mkdir -p ~/.bubblewrap
           cat > ~/.bubblewrap/config.json << EOF
           {
             "jdkPath": "${JAVA_HOME}",
-            "androidSdkPath": "${SDK_PATH}"
+            "androidSdkPath": "${ANDROID_HOME}"
           }
           EOF
           cat ~/.bubblewrap/config.json
