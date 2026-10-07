@@ -14,9 +14,21 @@ $destCity = trim((string) ($payload['dest_city'] ?? ''));
 $weight = trim((string) ($payload['weight'] ?? ''));
 $comment = trim((string) ($payload['comment'] ?? ''));
 
-if ($name === '' || $phone === '') {
-    capi_error('Укажите имя и телефон.');
+if (mb_strlen($name) < 2) {
+    capi_error('Укажите имя.');
 }
+if (mb_strlen($phone) < 5) {
+    capi_error('Укажите телефон.');
+}
+
+// Простая защита от спама: не больше одной заявки с одного браузера за 2 минуты
+// (как на реальном сайте сейчас) — отвечаем как обычно, просто не дублируем запись.
+capi_start_session();
+$lastKey = 'last_order_request_at';
+if (isset($_SESSION[$lastKey]) && (time() - $_SESSION[$lastKey]) < 120) {
+    capi_respond(['ok' => true]);
+}
+$_SESSION[$lastKey] = time();
 
 $stmt = $pdo->prepare('INSERT INTO site_order_requests (name, phone, city, dest_city, weight, comment) VALUES (?,?,?,?,?,?)');
 $stmt->execute([$name, $phone, $city ?: null, $destCity ?: null, $weight ?: null, $comment ?: null]);
