@@ -3,7 +3,7 @@
 require_once __DIR__ . '/_bootstrap.php';
 
 $stmt = $pdo->query("SELECT author_name, rating, review_text, photo_path, created_at
-    FROM reviews WHERE status = 'approved' ORDER BY created_at DESC LIMIT 100");
+    FROM reviews WHERE is_published = 1 ORDER BY created_at DESC LIMIT 100");
 $rows = $stmt->fetchAll();
 
 $cfg = crm_config();

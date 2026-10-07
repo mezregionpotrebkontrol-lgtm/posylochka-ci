@@ -82,8 +82,8 @@ if ($err !== null || empty($payment['id']) || empty($payment['confirmation']['co
     capi_error($err ?: 'Не удалось создать платёж. Попробуйте позже.', 502);
 }
 
-$pdo->prepare('INSERT INTO yookassa_payments (order_id, yk_payment_id, amount, status) VALUES (?,?,?,?)')
-    ->execute([$orderId, $payment['id'], $totals['total'], $payment['status'] ?? 'pending']);
+$pdo->prepare('INSERT INTO yookassa_payments (order_id, yk_payment_id, amount, confirmation_url, status) VALUES (?,?,?,?,?)')
+    ->execute([$orderId, $payment['id'], $totals['total'], $payment['confirmation']['confirmation_url'], $payment['status'] ?? 'pending']);
 
 crm_notify_owner("Новая заявка №{$orderId} с сайта (оплата онлайн): {$originCity} → {$destCity}, {$weight} кг, {$totals['total']} ₽. Трек: {$trackCode}.");
 

@@ -134,6 +134,7 @@ CREATE TABLE IF NOT EXISTS yookassa_payments (
     order_id INT UNSIGNED NOT NULL,
     yk_payment_id VARCHAR(64) NOT NULL,
     amount DECIMAL(10,2) NOT NULL,
+    confirmation_url VARCHAR(500) DEFAULT NULL,
     status VARCHAR(30) NOT NULL DEFAULT 'pending',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -143,7 +144,9 @@ CREATE TABLE IF NOT EXISTS yookassa_payments (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==========================================================
--- Отзывы с сайта (модерация перед публикацией)
+-- Отзывы с сайта. Публикуются сразу (is_published=1) — как на реальном сайте
+-- сейчас; скрыть/удалить отзыв можно вручную в CRM (reviews.php).
+-- submitter_ip — для анти-спам проверки (не больше 1 отзыва за 5 минут с IP).
 -- ==========================================================
 CREATE TABLE IF NOT EXISTS reviews (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -151,9 +154,11 @@ CREATE TABLE IF NOT EXISTS reviews (
     rating TINYINT UNSIGNED NOT NULL DEFAULT 5,
     review_text TEXT NOT NULL,
     photo_path VARCHAR(255) DEFAULT NULL,
-    status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+    is_published TINYINT(1) NOT NULL DEFAULT 1,
+    submitter_ip VARCHAR(45) DEFAULT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_rev_status (status)
+    INDEX idx_rev_published (is_published),
+    INDEX idx_rev_ip (submitter_ip)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==========================================================
@@ -199,8 +204,8 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
--- track_code — публичный трек-номер заявки, выдаваемый клиенту (и используемый
--- track_shipment.php). Отдельно от внутреннего id, чтобы не светить номер заявки.
+-- track_code — публичный трек-номер вида MP-YYMM-NNN, который видит клиент
+-- и по которому работает публичный трекер (track_shipment.php), как на сайте сейчас.
 SET @col_exists := (
     SELECT COUNT(*) FROM information_schema.COLUMNS
     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'track_code'
@@ -211,5 +216,21 @@ SET @sql := IF(@col_exists = 0,
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
+
+-- service — вид отправления (Посылка/Продукты/B2B), как в приложении.
+SET @col_exists := (
+    SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'service'
+);
+SET @sql := IF(@col_exists = 0,
+    'ALTER TABLE orders ADD COLUMN service VARCHAR(50) DEFAULT NULL AFTER track_code',
+    'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Публичный трекер на сайте строится из order_status_history (она уже есть
+-- в основной схеме) — отдельных step0..step4_at колонок не нужно, см.
+-- crm/api/track_shipment.php.
 
 SET FOREIGN_KEY_CHECKS = 1;

@@ -456,15 +456,16 @@ function capi_create_order_row(
     ?float $declaredValue,
     ?float $price,
     ?string $comment,
-    string $source
+    string $source,
+    ?string $service = null
 ): array {
     $trackCode = capi_generate_track_code($pdo);
     $stmt = $pdo->prepare('INSERT INTO orders
-        (client_id, from_city, to_city, to_address, weight_kg, declared_value, price, comment, status, source, track_code)
-        VALUES (?,?,?,?,?,?,?,?,\'new\',?,?)');
+        (client_id, from_city, to_city, to_address, weight_kg, declared_value, price, comment, status, source, track_code, service)
+        VALUES (?,?,?,?,?,?,?,?,\'new\',?,?,?)');
     $stmt->execute([
         $clientId, $fromCity ?: 'Дербент', $toCity ?: 'Санкт-Петербург', $toAddress ?: null,
-        $weightKg, $declaredValue, $price, $comment ?: null, $source, $trackCode,
+        $weightKg, $declaredValue, $price, $comment ?: null, $source, $trackCode, $service,
     ]);
     $orderId = (int) $pdo->lastInsertId();
     $pdo->prepare('INSERT INTO order_status_history (order_id, status, changed_by, comment) VALUES (?, \'new\', NULL, \'Заявка создана с сайта\')')
