@@ -89,6 +89,7 @@ if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') 
         $pdo->prepare('UPDATE orders SET status = ? WHERE id = ?')->execute([$newStatus, $id]);
         $pdo->prepare('INSERT INTO order_status_history (order_id, status, changed_by, comment) VALUES (?,?,?,?)')
             ->execute([$id, $newStatus, $user['id'], trim($_POST['status_comment'] ?? '') ?: null]);
+        crm_notify_client_status($pdo, $order, $newStatus);
         crm_flash_set('Статус изменён на «' . crm_order_status_label($newStatus) . '».');
     }
     crm_redirect('/crm/order.php?id=' . $id);

@@ -4,9 +4,16 @@
     <Files "config.php">
         Require all denied
     </Files>
+    <Files "max-notify.log">
+        Require all denied
+    </Files>
 </IfModule>
 <IfModule !mod_authz_core.c>
     <Files "config.php">
+        Order allow,deny
+        Deny from all
+    </Files>
+    <Files "max-notify.log">
         Order allow,deny
         Deny from all
     </Files>
