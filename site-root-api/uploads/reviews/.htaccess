@@ -1,0 +1,15 @@
+# Папка только для хранения загруженных фото к отзывам — запрещаем
+# выполнение PHP и листинг содержимого (на случай, если туда что-то попадёт).
+Options -Indexes
+
+<IfModule mod_authz_core.c>
+    <FilesMatch "\.php$">
+        Require all denied
+    </FilesMatch>
+</IfModule>
+<IfModule !mod_authz_core.c>
+    <FilesMatch "\.php$">
+        Order allow,deny
+        Deny from all
+    </FilesMatch>
+</IfModule>

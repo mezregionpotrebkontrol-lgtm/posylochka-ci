@@ -88,3 +88,28 @@ function crm_flash_get(): ?array
     unset($_SESSION['flash']);
     return $flash;
 }
+
+/**
+ * Приводит телефон к каноническому виду "79001234567" (11 цифр, начинается с 7).
+ * Поддерживает российские/белорусские номера. Возвращает null, если номер
+ * нельзя однозначно привести (слишком короткий, иностранный формат и т.п.).
+ */
+function crm_phone_digits(?string $phone): ?string
+{
+    if (!$phone) {
+        return null;
+    }
+    $digits = preg_replace('/\D+/', '', $phone);
+    if ($digits === '') {
+        return null;
+    }
+    if (strlen($digits) === 11 && $digits[0] === '8') {
+        $digits = '7' . substr($digits, 1);
+    } elseif (strlen($digits) === 10) {
+        $digits = '7' . $digits;
+    }
+    if (strlen($digits) !== 11 || $digits[0] !== '7') {
+        return null;
+    }
+    return $digits;
+}

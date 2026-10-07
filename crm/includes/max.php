@@ -32,22 +32,8 @@ function crm_max_log(string $line): void
  */
 function crm_phone_to_chat_id(?string $phone): ?string
 {
-    if (!$phone) {
-        return null;
-    }
-    $digits = preg_replace('/\D+/', '', $phone);
-    if ($digits === '') {
-        return null;
-    }
-    if (strlen($digits) === 11 && $digits[0] === '8') {
-        $digits = '7' . substr($digits, 1);
-    } elseif (strlen($digits) === 10) {
-        $digits = '7' . $digits;
-    }
-    if (strlen($digits) !== 11 || $digits[0] !== '7') {
-        return null;
-    }
-    return $digits . '@c.us';
+    $digits = crm_phone_digits($phone);
+    return $digits ? $digits . '@c.us' : null;
 }
 
 /**

@@ -122,6 +122,8 @@ tr:hover td{background:#f8f9fd;}
 .btn.small{padding:6px 12px;font-size:.8rem;}
 
 form.inline{display:inline;}
+form.inline-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+form.inline-row label{display:flex;align-items:center;gap:4px;font-weight:400;margin-bottom:0;}
 
 label{display:block;font-size:.84rem;font-weight:700;margin-bottom:6px;color:var(--text);}
 input[type=text],input[type=password],input[type=tel],input[type=email],input[type=number],input[type=date],select,textarea{

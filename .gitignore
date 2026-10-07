@@ -1,1 +1,8 @@
 crm/max-notify.log
+crm/sms-notify.log
+crm/email-notify.log
+crm/yookassa.log
+
+# Справочные копии файлов сайта (загружены пользователем для анализа контракта
+# API — не часть кода CRM, большие и могут меняться на сайте независимо).
+site-src/
