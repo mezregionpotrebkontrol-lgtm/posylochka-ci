@@ -348,7 +348,9 @@ function capi_request_email_reset(PDO $pdo, string $email): void
 
     $cfg = crm_config();
     $baseUrl = rtrim($cfg['site']['base_url'] ?? '', '/');
-    $link = $baseUrl . '/api/reset_password.php?token=' . $token;
+    // Ссылка ведёт на уже существующую на сайте страницу reset-password.html
+    // (она сама шлёт POST {token, password} на /api/reset_password.php).
+    $link = $baseUrl . '/reset-password.html?token=' . $token;
     $company = $cfg['company_name'] ?? 'Посылочка';
 
     $subject = "Восстановление пароля — {$company}";
