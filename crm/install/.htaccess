@@ -1,0 +1,10 @@
+# В этой папке лежит schema.mysql.sql с хешем пароля администратора —
+# прямой веб-доступ запрещён. Используйте файлы отсюда только через
+# менеджер файлов/phpMyAdmin на хостинге, не открывайте их по прямой ссылке.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>
