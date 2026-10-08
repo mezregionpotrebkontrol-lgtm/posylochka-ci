@@ -51,7 +51,7 @@ SELECT o.name, o.phone, o.created_at
 FROM u3661226_posylochka.orders o
 WHERE NOT EXISTS (SELECT 1 FROM u3661226_posylochka_crm.clients c WHERE c.phone = o.phone);
 
-INSERT INTO u3661226_posylochka_crm.orders
+INSERT IGNORE INTO u3661226_posylochka_crm.orders
     (client_id, status, from_city, to_city, weight_kg, price, payment_status, comment, source, created_at)
 SELECT
     c.id,
@@ -100,7 +100,7 @@ SELECT s.sender_name, s.phone, s.created_at
 FROM u3661226_posylochka.shipments s
 WHERE NOT EXISTS (SELECT 1 FROM u3661226_posylochka_crm.clients c WHERE c.phone = s.phone);
 
-INSERT INTO u3661226_posylochka_crm.orders
+INSERT IGNORE INTO u3661226_posylochka_crm.orders
     (client_id, status, from_city, to_city, to_address, weight_kg, comment, source, track_code, service, created_at)
 SELECT
     c.id,
