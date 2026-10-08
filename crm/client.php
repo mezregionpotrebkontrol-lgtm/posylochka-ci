@@ -34,6 +34,13 @@ $ordersStmt = $pdo->prepare('SELECT * FROM orders WHERE client_id = ? ORDER BY c
 $ordersStmt->execute([$id]);
 $orders = $ordersStmt->fetchAll();
 
+// Данные личного кабинета клиента на сайте (регистрация): email, паспорт,
+// адрес регистрации — заполняются самим клиентом при регистрации/заказе
+// с онлайн-оплатой. Таблица отдельная (client_accounts), один-к-одному с clients.
+$accStmt = $pdo->prepare('SELECT * FROM client_accounts WHERE client_id = ? LIMIT 1');
+$accStmt->execute([$id]);
+$account = $accStmt->fetch();
+
 $pageTitle = $client['name'];
 $activeNav = 'clients';
 require __DIR__ . '/includes/layout_top.php';
@@ -58,6 +65,40 @@ require __DIR__ . '/includes/layout_top.php';
     <textarea name="notes"><?= e($client['notes']) ?></textarea>
     <div class="form-actions"><button class="btn" type="submit">Сохранить</button></div>
   </form>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0;">Данные с регистрации на сайте (личный кабинет)</h3>
+  <?php if (!$account): ?>
+    <div class="empty-state">Клиент не регистрировал личный кабинет на сайте (пока нет логина/пароля) — эти данные появятся, как только он зарегистрируется.</div>
+  <?php else: ?>
+    <table>
+      <tbody>
+        <tr><th style="width:220px;">Телефон (логин)</th><td><?= e($account['phone']) ?></td></tr>
+        <tr><th>Email</th><td><?= e($account['email'] ?? '') ?: '—' ?></td></tr>
+        <tr><th>Дата рождения</th><td><?= $account['birth_date'] ? crm_date($account['birth_date'], 'd.m.Y') : '—' ?></td></tr>
+        <tr><th>Паспорт: серия и номер</th><td><?= e(trim(($account['passport_series'] ?? '') . ' ' . ($account['passport_number'] ?? ''))) ?: '—' ?></td></tr>
+        <tr><th>Кем выдан</th><td><?= e($account['passport_issued_by'] ?? '') ?: '—' ?></td></tr>
+        <tr><th>Код подразделения</th><td><?= e($account['passport_issued_code'] ?? '') ?: '—' ?></td></tr>
+        <tr><th>Дата выдачи</th><td><?= $account['passport_issue_date'] ? crm_date($account['passport_issue_date'], 'd.m.Y') : '—' ?></td></tr>
+        <tr><th>Адрес регистрации</th>
+          <td><?php
+            $regParts = array_filter([
+                $account['reg_city'] ?? '',
+                $account['reg_street'] ?? '',
+                $account['reg_house'] ?? '' ? 'д. ' . $account['reg_house'] : '',
+                $account['reg_apartment'] ?? '' ? 'кв. ' . $account['reg_apartment'] : '',
+                $account['reg_postcode'] ?? '' ? 'индекс ' . $account['reg_postcode'] : '',
+            ]);
+            echo $regParts ? e(implode(', ', $regParts)) : '—';
+          ?></td>
+        </tr>
+        <tr><th>Согласие на обработку ПДн</th><td><?= $account['consent_at'] ? 'Дано ' . crm_date($account['consent_at']) : '—' ?></td></tr>
+        <tr><th>Зарегистрирован</th><td><?= crm_date($account['created_at']) ?></td></tr>
+      </tbody>
+    </table>
+    <p class="text-muted" style="margin-top:12px;">Эти данные клиент указал сам при регистрации личного кабинета на сайте — здесь только для просмотра (чтобы изменить, попросите клиента обновить их в своём личном кабинете).</p>
+  <?php endif; ?>
 </div>
 
 <div class="card">
