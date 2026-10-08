@@ -82,10 +82,19 @@ function crm_yookassa_request(string $method, string $path, ?array $body = null,
 
 /**
  * Создаёт платёж на сумму $amount (руб.) с редиректом после оплаты на $returnUrl.
+ * $customerPhone/$customerEmail — для чека (54-ФЗ): в личном кабинете ЮKassa у
+ * магазина включена отправка чеков, поэтому без объекта "receipt" ЮKassa
+ * отвечает ошибкой "Receipt is missing or illegal".
  * @return array{0:?array,1:?string} [ответ ЮKassa (payment) или null, ошибка или null]
  */
-function crm_yookassa_create_payment(float $amount, string $description, string $returnUrl, array $metadata = []): array
-{
+function crm_yookassa_create_payment(
+    float $amount,
+    string $description,
+    string $returnUrl,
+    array $metadata = [],
+    ?string $customerPhone = null,
+    ?string $customerEmail = null
+): array {
     $body = [
         'amount'       => ['value' => number_format($amount, 2, '.', ''), 'currency' => 'RUB'],
         'capture'      => true,
@@ -93,6 +102,30 @@ function crm_yookassa_create_payment(float $amount, string $description, string 
         'description'  => mb_substr($description, 0, 128),
         'metadata'     => $metadata,
     ];
+
+    $customer = [];
+    if ($customerPhone) {
+        $customer['phone'] = $customerPhone;
+    }
+    if ($customerEmail) {
+        $customer['email'] = $customerEmail;
+    }
+    if ($customer) {
+        // vat_code: 1 = без НДС (УСН). Если у вас другая система налогообложения —
+        // скажите, какая, поправим код.
+        $body['receipt'] = [
+            'customer' => $customer,
+            'items'    => [[
+                'description'    => mb_substr($description, 0, 128),
+                'quantity'       => '1.00',
+                'amount'         => ['value' => number_format($amount, 2, '.', ''), 'currency' => 'RUB'],
+                'vat_code'       => 1,
+                'payment_subject' => 'service',
+                'payment_mode'    => 'full_payment',
+            ]],
+        ];
+    }
+
     return crm_yookassa_request('POST', '/payments', $body, bin2hex(random_bytes(16)));
 }
 

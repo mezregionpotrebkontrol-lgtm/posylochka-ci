@@ -75,7 +75,8 @@ $returnUrl = $baseUrl . '/app.html?paid_track=' . rawurlencode($trackCode);
     (float) $totals['total'],
     'Заявка №' . $orderId . ' (' . $originCity . ' → ' . $destCity . ')',
     $returnUrl,
-    ['order_id' => $orderId, 'track_code' => $trackCode]
+    ['order_id' => $orderId, 'track_code' => $trackCode],
+    '+' . $phoneDigits
 );
 
 if ($err !== null || empty($payment['id']) || empty($payment['confirmation']['confirmation_url'])) {
