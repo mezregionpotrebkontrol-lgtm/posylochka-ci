@@ -3,7 +3,51 @@ require_once __DIR__ . '/includes/bootstrap.php';
 $user = crm_require_role(['admin', 'operator']);
 $pdo = crm_db();
 
+// Добавить пункт (любой город России — список не ограничен).
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'point_create') {
+    crm_csrf_check();
+    if ($user['role'] !== 'admin') {
+        crm_flash_set('Добавлять пункты может только администратор.', 'err');
+        crm_redirect('/crm/warehouse.php');
+    }
+    $name = trim($_POST['name'] ?? '');
+    $city = trim($_POST['city'] ?? '');
+    $address = trim($_POST['address'] ?? '') ?: null;
+    if ($name === '' || $city === '') {
+        crm_flash_set('Укажите название и город пункта.', 'err');
+    } else {
+        $stmt = $pdo->prepare('INSERT INTO warehouse_points (name, city, address) VALUES (?,?,?)');
+        $stmt->execute([$name, $city, $address]);
+        crm_flash_set('Пункт «' . $name . '» добавлен.');
+    }
+    crm_redirect('/crm/warehouse.php?point_id=' . (int) $pdo->lastInsertId());
+}
+
+// Изменить/отключить пункт.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'point_update') {
+    crm_csrf_check();
+    if ($user['role'] !== 'admin') {
+        crm_flash_set('Изменять пункты может только администратор.', 'err');
+        crm_redirect('/crm/warehouse.php');
+    }
+    $id = (int) ($_POST['id'] ?? 0);
+    $name = trim($_POST['name'] ?? '');
+    $city = trim($_POST['city'] ?? '');
+    $address = trim($_POST['address'] ?? '') ?: null;
+    if ($id && $name !== '' && $city !== '') {
+        $stmt = $pdo->prepare('UPDATE warehouse_points SET name=?, city=?, address=?, active=? WHERE id=?');
+        $stmt->execute([$name, $city, $address, isset($_POST['active']) ? 1 : 0, $id]);
+        crm_flash_set('Пункт обновлён.');
+    } else {
+        crm_flash_set('Укажите название и город пункта.', 'err');
+    }
+    crm_redirect('/crm/warehouse.php?point_id=' . $id);
+}
+
 $points = $pdo->query('SELECT * FROM warehouse_points WHERE active = 1 ORDER BY city')->fetchAll();
+$allPoints = $user['role'] === 'admin'
+    ? $pdo->query('SELECT * FROM warehouse_points ORDER BY active DESC, city')->fetchAll()
+    : [];
 $pointId = (int) ($_GET['point_id'] ?? ($points[0]['id'] ?? 0));
 
 // Приём груза в пункте
@@ -95,10 +139,52 @@ require __DIR__ . '/includes/layout_top.php';
   <h3 style="margin-top:0;">Пункт</h3>
   <div class="inline-row" style="gap:10px;">
     <?php foreach ($points as $p): ?>
-      <a class="btn <?= $p['id'] == $pointId ? '' : 'secondary' ?> small" href="/crm/warehouse.php?point_id=<?= (int) $p['id'] ?>"><?= e($p['name']) ?></a>
+      <a class="btn <?= $p['id'] == $pointId ? '' : 'secondary' ?> small" href="/crm/warehouse.php?point_id=<?= (int) $p['id'] ?>"><?= e($p['name']) ?> (<?= e($p['city']) ?>)</a>
     <?php endforeach; ?>
   </div>
 </div>
+
+<?php if ($user['role'] === 'admin'): ?>
+<div class="card">
+  <h3 style="margin-top:0;">Пункты приёма/выдачи — любой город России</h3>
+  <?php if ($allPoints): ?>
+    <table>
+      <thead><tr><th>Пункт</th><th></th></tr></thead>
+      <tbody>
+        <?php foreach ($allPoints as $p): ?>
+        <tr>
+          <td>
+            <form method="post" class="inline-row">
+              <?= crm_csrf_field() ?>
+              <input type="hidden" name="action" value="point_update">
+              <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
+              <label>Название <input type="text" name="name" value="<?= e($p['name']) ?>" required style="width:160px;"></label>
+              <label>Город <input type="text" name="city" value="<?= e($p['city']) ?>" required style="width:150px;"></label>
+              <label>Адрес <input type="text" name="address" value="<?= e($p['address'] ?? '') ?>" placeholder="необязательно" style="width:220px;"></label>
+              <label><input type="checkbox" name="active" <?= $p['active'] ? 'checked' : '' ?>> вкл</label>
+              <button class="btn small" type="submit">Сохранить</button>
+            </form>
+          </td>
+        </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+  <?php else: ?>
+    <div class="empty-state">Пунктов пока нет.</div>
+  <?php endif; ?>
+  <p class="text-muted" style="margin-top:12px;">Отключённый пункт («Вкл» снят) скрывается из списка выше, но его история сохраняется.</p>
+
+  <h4>Добавить пункт</h4>
+  <form method="post" class="form-row">
+    <?= crm_csrf_field() ?>
+    <input type="hidden" name="action" value="point_create">
+    <label>Название<input type="text" name="name" placeholder="Например: Пункт Москва" required></label>
+    <label>Город<input type="text" name="city" placeholder="Например: Москва" required></label>
+    <label style="grid-column:1/-1;">Адрес (необязательно)<input type="text" name="address" placeholder="Улица, дом"></label>
+    <div style="grid-column:1/-1;"><button class="btn" type="submit">Добавить пункт</button></div>
+  </form>
+</div>
+<?php endif; ?>
 
 <?php if ($pointId): ?>
 <div class="card">
