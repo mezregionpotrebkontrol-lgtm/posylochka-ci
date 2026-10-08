@@ -1,5 +1,9 @@
 <?php
 require_once __DIR__ . '/includes/bootstrap.php';
+// crm_notify_owner() (MAX + почта владельцу) живёт в clientapi.php/email.php —
+// обычный CRM-bootstrap их не подключает (они нужны только публичному API).
+require_once __DIR__ . '/includes/email.php';
+require_once __DIR__ . '/includes/clientapi.php';
 $user = crm_require_role(['admin', 'operator']);
 $pdo = crm_db();
 
@@ -50,6 +54,13 @@ $allPoints = $user['role'] === 'admin'
     : [];
 $pointId = (int) ($_GET['point_id'] ?? ($points[0]['id'] ?? 0));
 
+// Порядок статусов — чтобы складские события продвигали статус только вперёд
+// и никогда не откатывали "доставлена"/"отменена" обратно.
+function crm_warehouse_status_rank(string $status): int
+{
+    return ['new' => 0, 'accepted' => 1, 'in_transit' => 2, 'delivered' => 3, 'cancelled' => 99][$status] ?? 0;
+}
+
 // Приём груза в пункте
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'receive') {
     crm_csrf_check();
@@ -64,6 +75,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'recei
             trim($_POST['note'] ?? '') ?: null,
             $user['id'],
         ]);
+
+        // Продвигаем статус заявки до "в пути" и уведомляем клиента —
+        // раньше приём на складе никак не отражался на статусе/уведомлениях.
+        $orderStmt = $pdo->prepare('SELECT * FROM orders WHERE id = ? LIMIT 1');
+        $orderStmt->execute([$orderId]);
+        $ord = $orderStmt->fetch();
+        if ($ord && crm_warehouse_status_rank($ord['status']) < crm_warehouse_status_rank('in_transit')) {
+            $pdo->prepare("UPDATE orders SET status = 'in_transit' WHERE id = ?")->execute([$orderId]);
+            $pdo->prepare('INSERT INTO order_status_history (order_id, status, changed_by, comment) VALUES (?, \'in_transit\', ?, ?)')
+                ->execute([$orderId, $user['id'], 'Принято в пункте (склад)']);
+            crm_notify_client_status($pdo, $ord, 'in_transit');
+        }
+
         crm_flash_set('Груз по заявке №' . $orderId . ' принят в пункте.');
     } else {
         crm_flash_set('Выберите заявку.', 'err');
@@ -86,6 +110,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'issue
             $recipient,
             $user['id'],
         ]);
+
+        // Продвигаем статус заявки до "доставлена", уведомляем клиента (MAX)
+        // и владельца (MAX + почта) — раньше выдача не отправляла ничего.
+        $orderStmt = $pdo->prepare('SELECT * FROM orders WHERE id = ? LIMIT 1');
+        $orderStmt->execute([$orderId]);
+        $ord = $orderStmt->fetch();
+        if ($ord && crm_warehouse_status_rank($ord['status']) < crm_warehouse_status_rank('delivered')) {
+            $pdo->prepare("UPDATE orders SET status = 'delivered' WHERE id = ?")->execute([$orderId]);
+            $pdo->prepare('INSERT INTO order_status_history (order_id, status, changed_by, comment) VALUES (?, \'delivered\', ?, ?)')
+                ->execute([$orderId, $user['id'], 'Выдано получателю «' . $recipient . '» (склад)']);
+            crm_notify_client_status($pdo, $ord, 'delivered');
+        }
+        $pointStmt = $pdo->prepare('SELECT name, city FROM warehouse_points WHERE id = ?');
+        $pointStmt->execute([$ptId]);
+        $pt = $pointStmt->fetch();
+        crm_notify_owner('Заявка №' . $orderId . ' выдана получателю «' . $recipient . '» в пункте «' . ($pt['name'] ?? $ptId) . '» (' . ($pt['city'] ?? '') . ').');
+
         crm_flash_set('Заявка №' . $orderId . ' выдана получателю «' . $recipient . '».');
     } else {
         crm_flash_set('Укажите заявку и имя получателя.', 'err');
