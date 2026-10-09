@@ -200,7 +200,7 @@ function wb_check(bool $on): string
 
 <div class="footer-note">ПОСЫЛОЧКА · ИП Казаченко Наталия Николаевна · моя-посылочка.рф · Документ является подтверждением приёма груза к перевозке</div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/JsBarcode/3.11.5/JsBarcode.all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.12.0/JsBarcode.all.min.js"></script>
 <script>
 document.querySelectorAll('svg.barcode').forEach(function (el) {
   var code = el.getAttribute('data-code') || '';
