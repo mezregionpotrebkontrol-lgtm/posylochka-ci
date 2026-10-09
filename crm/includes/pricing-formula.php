@@ -10,17 +10,73 @@
 
 require_once __DIR__ . '/price-data.php';
 
-function crm_price_pack_types(): array
+/**
+ * Параметры формулы расчёта — редактируются в CRM (крм/pricing.php) и
+ * хранятся в таблице pricing_config. Если таблицы ещё нет (миграция не
+ * выполнена) или какого-то параметра нет в БД — используются значения по
+ * умолчанию ниже (это те же цифры, что исторически были захардкожены и
+ * продублированы в JS-калькуляторе на сайте).
+ */
+function crm_price_config_defaults(): array
 {
     return [
-        'none'      => 0,
-        'bag'       => 50,
-        'docs'      => 30,
-        'box_s'     => 120,
-        'box_m'     => 180,
-        'box_l'     => 250,
-        'bubble'    => 100,
-        'thermobox' => 350,
+        'weight_band1_max'    => 5,
+        'weight_band1_rate'   => 180,
+        'weight_band2_max'    => 15,
+        'weight_band2_rate'   => 90,
+        'weight_band3_max'    => 30,
+        'weight_band3_rate'   => 80,
+        'weight_band4_rate'   => 65,
+        'km_mult_base'        => 0.85,
+        'km_mult_div'         => 10000,
+        'min_base_price'      => 400,
+        'pack_none'           => 0,
+        'pack_bag'            => 50,
+        'pack_docs'           => 30,
+        'pack_box_s'          => 120,
+        'pack_box_m'          => 180,
+        'pack_box_l'          => 250,
+        'pack_bubble'         => 100,
+        'pack_thermobox'      => 350,
+        'surcharge_fragile'   => 300,
+        'surcharge_inventory' => 100,
+        'surcharge_sms'       => 20,
+        'insurance_rate'      => 0.015,
+        'insurance_min'       => 50,
+    ];
+}
+
+function crm_price_config(): array
+{
+    static $config = null;
+    if ($config !== null) {
+        return $config;
+    }
+    $config = crm_price_config_defaults();
+    try {
+        $rows = crm_db()->query('SELECT config_key, config_value FROM pricing_config')->fetchAll();
+        foreach ($rows as $row) {
+            $config[$row['config_key']] = (float) $row['config_value'];
+        }
+    } catch (Throwable $e) {
+        // Таблица pricing_config ещё не создана (миграция 005 не выполнена) —
+        // работаем на значениях по умолчанию, ничего не ломаем.
+    }
+    return $config;
+}
+
+function crm_price_pack_types(): array
+{
+    $c = crm_price_config();
+    return [
+        'none'      => $c['pack_none'],
+        'bag'       => $c['pack_bag'],
+        'docs'      => $c['pack_docs'],
+        'box_s'     => $c['pack_box_s'],
+        'box_m'     => $c['pack_box_m'],
+        'box_l'     => $c['pack_box_l'],
+        'bubble'    => $c['pack_bubble'],
+        'thermobox' => $c['pack_thermobox'],
     ];
 }
 
@@ -110,7 +166,13 @@ function crm_price_tiered_cost(float $w): float
     if ($w <= 0) {
         return 0;
     }
-    $bands = [[5, 180], [15, 90], [30, 80], [INF, 65]];
+    $c = crm_price_config();
+    $bands = [
+        [$c['weight_band1_max'], $c['weight_band1_rate']],
+        [$c['weight_band2_max'], $c['weight_band2_rate']],
+        [$c['weight_band3_max'], $c['weight_band3_rate']],
+        [INF, $c['weight_band4_rate']],
+    ];
     $cost = 0;
     $prev = 0;
     foreach ($bands as [$upto, $rate]) {
@@ -143,29 +205,30 @@ function crm_calc_checkout_total(string $originCity, string $destCity, float $we
         return null;
     }
 
-    $kmMult = 0.85 + ($routeKm / 10000);
+    $c = crm_price_config();
+    $kmMult = $c['km_mult_base'] + ($routeKm / $c['km_mult_div']);
     $base = crm_price_tiered_cost($weightKg) * $kmMult;
-    if ($base < 400) {
-        $base = 400;
+    if ($base < $c['min_base_price']) {
+        $base = $c['min_base_price'];
     }
 
     $packTypes = crm_price_pack_types();
     $packType = array_key_exists($addons['pack_type'] ?? '', $packTypes) ? $addons['pack_type'] : 'none';
     $extra = $packTypes[$packType];
     if (!empty($addons['fragile'])) {
-        $extra += 300;
+        $extra += $c['surcharge_fragile'];
     }
     if (!empty($addons['inventory'])) {
-        $extra += 100;
+        $extra += $c['surcharge_inventory'];
     }
     if (!empty($addons['sms'])) {
-        $extra += 20;
+        $extra += $c['surcharge_sms'];
     }
 
     $insure = 0;
     $declared = (float) ($addons['insure_value'] ?? 0);
     if ($declared > 0) {
-        $insure = max($declared * 0.015, 50);
+        $insure = max($declared * $c['insurance_rate'], $c['insurance_min']);
     }
 
     $total = $base + $extra + $insure;

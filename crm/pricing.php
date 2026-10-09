@@ -1,7 +1,54 @@
 <?php
 require_once __DIR__ . '/includes/bootstrap.php';
+require_once __DIR__ . '/includes/pricing-formula.php';
 $user = crm_require_role(['admin']);
 $pdo = crm_db();
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update_formula') {
+    crm_csrf_check();
+    $defaults = crm_price_config_defaults();
+    $stmt = $pdo->prepare('INSERT INTO pricing_config (config_key, config_value, label, group_name, sort_order)
+        VALUES (?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE config_value = VALUES(config_value)');
+    // Метки/группы/порядок берём из миграции 005 — здесь достаточно обновить
+    // только значения, но на случай отсутствия строки в pricing_config
+    // (миграция не выполнена) вставляем её с осмысленными метаданными.
+    $meta = [
+        'weight_band1_max'    => ['Вес до, кг (1-я ступень)', 'weight', 1],
+        'weight_band1_rate'   => ['₽/кг на 1-й ступени (до указанного веса)', 'weight', 2],
+        'weight_band2_max'    => ['Вес до, кг (2-я ступень)', 'weight', 3],
+        'weight_band2_rate'   => ['₽/кг на 2-й ступени', 'weight', 4],
+        'weight_band3_max'    => ['Вес до, кг (3-я ступень)', 'weight', 5],
+        'weight_band3_rate'   => ['₽/кг на 3-й ступени', 'weight', 6],
+        'weight_band4_rate'   => ['₽/кг свыше 3-й ступени', 'weight', 7],
+        'km_mult_base'        => ['Коэффициент расстояния — минимум', 'distance', 8],
+        'km_mult_div'         => ['Коэффициент расстояния — делитель (км)', 'distance', 9],
+        'min_base_price'      => ['Минимальная базовая цена, ₽', 'distance', 10],
+        'pack_none'           => ['Без упаковки, ₽', 'pack', 11],
+        'pack_bag'            => ['Фирменный пакет, ₽', 'pack', 12],
+        'pack_docs'           => ['Пакет для документов, ₽', 'pack', 13],
+        'pack_box_s'          => ['Коробка S, ₽', 'pack', 14],
+        'pack_box_m'          => ['Коробка M, ₽', 'pack', 15],
+        'pack_box_l'          => ['Коробка L, ₽', 'pack', 16],
+        'pack_bubble'         => ['Пузырчатая плёнка, ₽', 'pack', 17],
+        'pack_thermobox'      => ['Термобокс, ₽', 'pack', 18],
+        'surcharge_fragile'   => ['Наценка «хрупкое», ₽', 'addon', 19],
+        'surcharge_inventory' => ['Наценка «опись вложения», ₽', 'addon', 20],
+        'surcharge_sms'       => ['Наценка «SMS-уведомления», ₽', 'addon', 21],
+        'insurance_rate'      => ['Страхование — ставка от объявленной ценности', 'addon', 22],
+        'insurance_min'       => ['Страхование — минимальная сумма, ₽', 'addon', 23],
+    ];
+    foreach ($defaults as $key => $defaultVal) {
+        if (!isset($_POST[$key]) || $_POST[$key] === '') {
+            continue;
+        }
+        $val = (float) str_replace(',', '.', $_POST[$key]);
+        [$label, $group, $sort] = $meta[$key];
+        $stmt->execute([$key, $val, $label, $group, $sort]);
+    }
+    crm_flash_set('Тариф калькулятора обновлён.');
+    crm_redirect('/crm/pricing.php');
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'create') {
     crm_csrf_check();
@@ -47,6 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delet
 }
 
 $rules = $pdo->query('SELECT * FROM pricing_rules ORDER BY from_city, to_city')->fetchAll();
+$formula = crm_price_config();
 
 $pageTitle = 'Цены';
 $activeNav = 'pricing';
@@ -54,8 +102,85 @@ require __DIR__ . '/includes/layout_top.php';
 ?>
 
 <div class="card">
-  <h3 style="margin-top:0;">Тарифы по маршрутам</h3>
-  <p class="text-muted">Эти цены использует и калькулятор на сайте, и CRM при создании заявки — единый источник, менять нужно только здесь. Цена = база + (цена за кг × вес), но не меньше минимальной.</p>
+  <h3 style="margin-top:0;">Тариф калькулятора (вес, расстояние, упаковка, страховка)</h3>
+  <p class="text-muted">
+    Это настоящая формула, по которой считается стоимость для оплаты онлайн на сайте
+    (сервер всегда пересчитывает сумму сам по этим параметрам — цену, присланную из
+    браузера, он не принимает). Таблица маршрутов ниже — отдельный, более простой
+    справочник, который формула калькулятора не использует.
+  </p>
+  <p style="background:#fff3cd;border:1px solid #ffe69c;border-radius:8px;padding:10px 14px;">
+    ⚠️ Важно: те же цифры продублированы в коде калькулятора на сайте (файл
+    <code>site-src/app.html</code>), чтобы посетитель видел предварительную цену
+    ещё до оформления заявки. Изменения здесь обновляют только CRM/сервер (то есть
+    итоговую сумму, которую реально спишет оплата) — калькулятор на самом сайте
+    нужно будет обновить отдельно, иначе показанная клиенту предварительная цена
+    может не совпадать с реально списанной суммой. Если нужно — попросите внести
+    те же изменения и на сайт.
+  </p>
+  <form method="post">
+    <?= crm_csrf_field() ?>
+    <input type="hidden" name="action" value="update_formula">
+
+    <h4>Тариф по весу (₽/кг по ступеням)</h4>
+    <div class="form-row">
+      <label>До, кг <input type="number" step="0.01" name="weight_band1_max" value="<?= e((string) $formula['weight_band1_max']) ?>" style="width:90px;"></label>
+      <label>₽/кг <input type="number" step="0.01" name="weight_band1_rate" value="<?= e((string) $formula['weight_band1_rate']) ?>" style="width:90px;"></label>
+    </div>
+    <div class="form-row">
+      <label>До, кг <input type="number" step="0.01" name="weight_band2_max" value="<?= e((string) $formula['weight_band2_max']) ?>" style="width:90px;"></label>
+      <label>₽/кг <input type="number" step="0.01" name="weight_band2_rate" value="<?= e((string) $formula['weight_band2_rate']) ?>" style="width:90px;"></label>
+    </div>
+    <div class="form-row">
+      <label>До, кг <input type="number" step="0.01" name="weight_band3_max" value="<?= e((string) $formula['weight_band3_max']) ?>" style="width:90px;"></label>
+      <label>₽/кг <input type="number" step="0.01" name="weight_band3_rate" value="<?= e((string) $formula['weight_band3_rate']) ?>" style="width:90px;"></label>
+    </div>
+    <div class="form-row">
+      <label>₽/кг свыше последней ступени <input type="number" step="0.01" name="weight_band4_rate" value="<?= e((string) $formula['weight_band4_rate']) ?>" style="width:90px;"></label>
+    </div>
+
+    <h4>Коэффициент расстояния и минимальная цена</h4>
+    <p class="text-muted" style="margin-top:-6px;">Коэффициент = минимум + (км маршрута ÷ делитель). Итоговая база = (тариф по весу) × коэффициент, но не меньше минимальной базовой цены.</p>
+    <div class="form-row">
+      <label>Коэффициент — минимум <input type="number" step="0.0001" name="km_mult_base" value="<?= e((string) $formula['km_mult_base']) ?>" style="width:90px;"></label>
+      <label>Коэффициент — делитель, км <input type="number" step="1" name="km_mult_div" value="<?= e((string) $formula['km_mult_div']) ?>" style="width:100px;"></label>
+      <label>Минимальная базовая цена, ₽ <input type="number" step="0.01" name="min_base_price" value="<?= e((string) $formula['min_base_price']) ?>" style="width:100px;"></label>
+    </div>
+
+    <h4>Упаковка, ₽</h4>
+    <div class="form-row">
+      <label>Без упаковки <input type="number" step="0.01" name="pack_none" value="<?= e((string) $formula['pack_none']) ?>" style="width:90px;"></label>
+      <label>Фирменный пакет <input type="number" step="0.01" name="pack_bag" value="<?= e((string) $formula['pack_bag']) ?>" style="width:90px;"></label>
+      <label>Пакет для документов <input type="number" step="0.01" name="pack_docs" value="<?= e((string) $formula['pack_docs']) ?>" style="width:90px;"></label>
+    </div>
+    <div class="form-row">
+      <label>Коробка S <input type="number" step="0.01" name="pack_box_s" value="<?= e((string) $formula['pack_box_s']) ?>" style="width:90px;"></label>
+      <label>Коробка M <input type="number" step="0.01" name="pack_box_m" value="<?= e((string) $formula['pack_box_m']) ?>" style="width:90px;"></label>
+      <label>Коробка L <input type="number" step="0.01" name="pack_box_l" value="<?= e((string) $formula['pack_box_l']) ?>" style="width:90px;"></label>
+    </div>
+    <div class="form-row">
+      <label>Пузырчатая плёнка <input type="number" step="0.01" name="pack_bubble" value="<?= e((string) $formula['pack_bubble']) ?>" style="width:90px;"></label>
+      <label>Термобокс <input type="number" step="0.01" name="pack_thermobox" value="<?= e((string) $formula['pack_thermobox']) ?>" style="width:90px;"></label>
+    </div>
+
+    <h4>Доп. наценки и страхование</h4>
+    <div class="form-row">
+      <label>«Хрупкое», ₽ <input type="number" step="0.01" name="surcharge_fragile" value="<?= e((string) $formula['surcharge_fragile']) ?>" style="width:90px;"></label>
+      <label>«Опись вложения», ₽ <input type="number" step="0.01" name="surcharge_inventory" value="<?= e((string) $formula['surcharge_inventory']) ?>" style="width:90px;"></label>
+      <label>SMS-уведомления, ₽ <input type="number" step="0.01" name="surcharge_sms" value="<?= e((string) $formula['surcharge_sms']) ?>" style="width:90px;"></label>
+    </div>
+    <div class="form-row">
+      <label>Страхование — ставка (доля от ценности) <input type="number" step="0.0001" name="insurance_rate" value="<?= e((string) $formula['insurance_rate']) ?>" style="width:100px;"></label>
+      <label>Страхование — минимум, ₽ <input type="number" step="0.01" name="insurance_min" value="<?= e((string) $formula['insurance_min']) ?>" style="width:100px;"></label>
+    </div>
+
+    <div class="form-actions"><button class="btn" type="submit">Сохранить тариф</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0;">Тарифы по маршрутам (справочник, не используется калькулятором)</h3>
+  <p class="text-muted">Этот список — отдельный, упрощённый справочник маршрутов. Онлайн-калькулятор и оплата на сайте используют формулу выше, а не эту таблицу.</p>
   <?php if (!$rules): ?>
     <div class="empty-state">Маршруты ещё не добавлены.</div>
   <?php else: ?>
