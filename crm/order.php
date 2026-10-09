@@ -183,6 +183,7 @@ require __DIR__ . '/includes/layout_top.php';
         <button class="btn small secondary" type="submit"><?= $order['payment_status'] === 'paid' ? 'Снять отметку оплаты' : 'Отметить оплаченным' ?></button>
       </form>
       <a class="btn small" href="/crm/invoice.php?order_id=<?= (int)$order['id'] ?>">Выставить счёт</a>
+      <a class="btn small secondary" href="/crm/waybill.php?id=<?= (int)$order['id'] ?>" target="_blank">Печать накладной</a>
     </div>
   </div>
 </div>
