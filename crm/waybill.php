@@ -50,6 +50,7 @@ function wb_check(bool $on): string
   .track-box{border:2px solid var(--brand);border-radius:6px;padding:6px 14px;text-align:center;}
   .track-box .lbl{font-size:.68rem;color:#6b7490;text-transform:uppercase;letter-spacing:.04em;}
   .track-box .code{font-size:1.1rem;font-weight:800;color:var(--brand);}
+  .track-box svg{display:block;margin-top:4px;}
   .meta-row{display:flex;gap:24px;margin-bottom:14px;font-size:.84rem;}
   .meta-row div{flex:1;}
   .meta-row .lbl{color:#6b7490;font-size:.74rem;}
@@ -112,6 +113,7 @@ function wb_check(bool $on): string
     <div class="track-box">
       <div class="lbl">Трек-номер</div>
       <div class="code"><?= e($trackLabel) ?></div>
+      <svg class="barcode" data-code="<?= e($trackLabel) ?>"></svg>
     </div>
   </div>
 
@@ -180,6 +182,7 @@ function wb_check(bool $on): string
     <div class="track-box">
       <div class="lbl">Трек-номер</div>
       <div class="code"><?= e($trackLabel) ?></div>
+      <svg class="barcode" data-code="<?= e($trackLabel) ?>"></svg>
     </div>
   </div>
   <div class="grid">
@@ -196,6 +199,23 @@ function wb_check(bool $on): string
 </div>
 
 <div class="footer-note">ПОСЫЛОЧКА · ИП Казаченко Наталия Николаевна · моя-посылочка.рф · Документ является подтверждением приёма груза к перевозке</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/JsBarcode/3.11.5/JsBarcode.all.min.js"></script>
+<script>
+document.querySelectorAll('svg.barcode').forEach(function (el) {
+  var code = el.getAttribute('data-code') || '';
+  if (!code || typeof JsBarcode === 'undefined') return;
+  try {
+    JsBarcode(el, code, {
+      format: 'CODE128',
+      width: 1.6,
+      height: 36,
+      displayValue: false,
+      margin: 0
+    });
+  } catch (e) { /* если код содержит символы, не подходящие CODE128, просто не рисуем штрихкод */ }
+});
+</script>
 
 </body>
 </html>
