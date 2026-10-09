@@ -13,12 +13,13 @@ $companyName = crm_config()['company_name'] ?? 'Посылочка';
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title><?= e($pageTitle ?? $companyName) ?> — CRM <?= e($companyName) ?></title>
+<link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="stylesheet" href="/crm/assets/style.css">
 </head>
 <body>
 <div class="layout">
   <aside class="sidebar">
-    <div class="brand">📦 <?= e($companyName) ?></div>
+    <div class="brand"><img src="/crm/assets/logo.png" alt="<?= e($companyName) ?>"> <span><?= e($companyName) ?></span></div>
     <nav>
       <?php if (in_array($user['role'], ['admin','operator'], true)): ?>
         <a href="/crm/index.php" class="<?= ($activeNav ?? '') === 'dashboard' ? 'active' : '' ?>">Главная</a>
