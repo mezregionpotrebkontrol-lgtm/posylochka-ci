@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/includes/bootstrap.php';
+require_once __DIR__ . '/includes/email.php';
+require_once __DIR__ . '/includes/clientapi.php';
 $user = crm_require_role(['admin', 'operator']);
 $pdo = crm_db();
 
@@ -90,6 +92,9 @@ if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') 
         $pdo->prepare('INSERT INTO order_status_history (order_id, status, changed_by, comment) VALUES (?,?,?,?)')
             ->execute([$id, $newStatus, $user['id'], trim($_POST['status_comment'] ?? '') ?: null]);
         crm_notify_client_status($pdo, $order, $newStatus);
+        if ($newStatus === 'delivered') {
+            crm_notify_owner('Заявка №' . $id . ' (' . $order['from_city'] . ' → ' . $order['to_city'] . ') отмечена как доставленная.');
+        }
         crm_flash_set('Статус изменён на «' . crm_order_status_label($newStatus) . '».');
     }
     crm_redirect('/crm/order.php?id=' . $id);

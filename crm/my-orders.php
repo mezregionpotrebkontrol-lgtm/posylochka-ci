@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/includes/bootstrap.php';
+require_once __DIR__ . '/includes/email.php';
+require_once __DIR__ . '/includes/clientapi.php';
 $user = crm_require_role(['courier', 'admin']);
 $pdo = crm_db();
 
@@ -20,6 +22,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'chang
         $pdo->prepare('INSERT INTO order_status_history (order_id, status, changed_by, comment) VALUES (?,?,?,?)')
             ->execute([$orderId, $newStatus, $user['id'], 'Изменено курьером']);
         crm_notify_client_status($pdo, $ord, $newStatus);
+        if ($newStatus === 'delivered') {
+            crm_notify_owner('Заявка №' . $orderId . ' (' . $ord['from_city'] . ' → ' . $ord['to_city'] . ') доставлена курьером «' . $user['name'] . '».');
+        }
         crm_flash_set('Статус заявки №' . $orderId . ' обновлён.');
     } else {
         crm_flash_set('Не удалось изменить статус.', 'err');
