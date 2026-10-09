@@ -52,7 +52,7 @@ if ($invoice && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? ''
         ->execute([$id, $amount, $method ?: 'перевод', $user['id']]);
     $pdo->prepare("UPDATE invoices SET status = 'paid', paid_at = NOW() WHERE id = ?")->execute([$id]);
     if ($invoice['order_id']) {
-        $pdo->prepare("UPDATE orders SET payment_status = 'paid' WHERE id = ?")->execute([$invoice['order_id']]);
+        $pdo->prepare("UPDATE orders SET payment_status = 'paid', payment_method = 'invoice' WHERE id = ?")->execute([$invoice['order_id']]);
     }
     crm_flash_set('Оплата зафиксирована.');
     crm_redirect('/crm/invoice.php?id=' . $id);

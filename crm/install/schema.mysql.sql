@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS orders (
     declared_value DECIMAL(12,2) DEFAULT NULL,
     price DECIMAL(12,2) DEFAULT NULL,
     payment_status ENUM('unpaid','paid') NOT NULL DEFAULT 'unpaid',
+    payment_method ENUM('online','cash','terminal','invoice') DEFAULT NULL,
     planned_date DATE DEFAULT NULL,
     comment TEXT DEFAULT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

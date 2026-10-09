@@ -21,7 +21,6 @@ if (!$order) {
 
 $trackLabel = $order['track_code'] ?: ('№' . $order['id']);
 $service = $order['service'] ?? '';
-$isPaid = $order['payment_status'] === 'paid';
 
 function wb_check(bool $on): string
 {
@@ -163,9 +162,10 @@ function wb_check(bool $on): string
   </table>
 
   <div class="pay-row">
-    <?= wb_check(!$isPaid) ?> Наличными при приёме &nbsp;&nbsp;
-    <?= wb_check($isPaid) ?> Онлайн-оплата (ЮKassa) &nbsp;&nbsp;
-    <?= wb_check(false) ?> При получении
+    <?= wb_check($order['payment_method'] === 'cash') ?> Наличный расчёт &nbsp;&nbsp;
+    <?= wb_check($order['payment_method'] === 'terminal') ?> Оплата через терминал &nbsp;&nbsp;
+    <?= wb_check($order['payment_method'] === 'invoice') ?> Оплата по счёту &nbsp;&nbsp;
+    <?= wb_check($order['payment_method'] === 'online') ?> Онлайн на сайте
   </div>
 
   <div class="sign-row">

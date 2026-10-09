@@ -117,7 +117,7 @@ require __DIR__ . '/includes/layout_top.php';
         <td><a href="/crm/order.php?id=<?= (int)$o['id'] ?>">#<?= (int)$o['id'] ?></a></td>
         <td><?= e($o['from_city']) ?> → <?= e($o['to_city']) ?></td>
         <td><span class="badge <?= crm_order_status_class($o['status']) ?>"><?= e(crm_order_status_label($o['status'])) ?></span></td>
-        <td><?= $o['payment_status'] === 'paid' ? '<span class="badge badge-green">Оплачен</span>' : '<span class="badge badge-grey">Не оплачен</span>' ?></td>
+        <td><?= $o['payment_status'] === 'paid' ? '<span class="badge badge-green">Оплачен</span><br><span class="text-muted" style="font-size:.78rem;">' . e(crm_payment_method_label($o['payment_method'])) . '</span>' : '<span class="badge badge-grey">Не оплачен</span>' ?></td>
         <td><?= crm_money($o['price'] !== null ? (float)$o['price'] : null) ?></td>
         <td><?= crm_date($o['created_at'], 'd.m.Y') ?></td>
       </tr>

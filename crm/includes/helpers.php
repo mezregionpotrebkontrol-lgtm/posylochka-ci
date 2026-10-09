@@ -30,6 +30,16 @@ function crm_order_status_class(string $status): string
     ][$status] ?? 'badge-grey';
 }
 
+function crm_payment_method_label(?string $method): string
+{
+    return [
+        'online'   => 'Онлайн на сайте',
+        'cash'     => 'Наличный расчёт',
+        'terminal' => 'Оплата через терминал',
+        'invoice'  => 'Оплата по счёту',
+    ][$method] ?? '—';
+}
+
 function crm_invoice_status_label(string $status): string
 {
     return [

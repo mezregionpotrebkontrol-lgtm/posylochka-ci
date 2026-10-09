@@ -101,10 +101,23 @@ if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') 
 }
 
 // Отметка оплаты прямо из заявки
-if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'toggle_payment') {
+if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'mark_paid') {
     crm_csrf_check();
-    $newVal = $order['payment_status'] === 'paid' ? 'unpaid' : 'paid';
-    $pdo->prepare('UPDATE orders SET payment_status = ? WHERE id = ?')->execute([$newVal, $id]);
+    $allowedMethods = ['online', 'cash', 'terminal', 'invoice'];
+    $method = $_POST['payment_method'] ?? '';
+    if (!in_array($method, $allowedMethods, true)) {
+        crm_flash_set('Выберите способ оплаты.', 'err');
+    } else {
+        $pdo->prepare('UPDATE orders SET payment_status = ?, payment_method = ? WHERE id = ?')->execute(['paid', $method, $id]);
+        crm_flash_set('Заявка отмечена оплаченной (' . crm_payment_method_label($method) . ').');
+    }
+    crm_redirect('/crm/order.php?id=' . $id);
+}
+
+if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'unmark_paid') {
+    crm_csrf_check();
+    $pdo->prepare('UPDATE orders SET payment_status = ?, payment_method = NULL WHERE id = ?')->execute(['unpaid', $id]);
+    crm_flash_set('Отметка оплаты снята.');
     crm_redirect('/crm/order.php?id=' . $id);
 }
 
@@ -171,17 +184,32 @@ require __DIR__ . '/includes/layout_top.php';
     <div>
       <span class="badge <?= crm_order_status_class($order['status']) ?>" style="font-size:.85rem;"><?= e(crm_order_status_label($order['status'])) ?></span>
       <?php if ($order['payment_status'] === 'paid'): ?>
-        <span class="badge badge-green" style="font-size:.85rem;">Оплачен</span>
+        <span class="badge badge-green" style="font-size:.85rem;">Оплачен — <?= e(crm_payment_method_label($order['payment_method'])) ?></span>
       <?php else: ?>
         <span class="badge badge-grey" style="font-size:.85rem;">Не оплачен</span>
       <?php endif; ?>
     </div>
-    <div style="display:flex;gap:8px;">
-      <form method="post" class="inline">
-        <?= crm_csrf_field() ?>
-        <input type="hidden" name="action" value="toggle_payment">
-        <button class="btn small secondary" type="submit"><?= $order['payment_status'] === 'paid' ? 'Снять отметку оплаты' : 'Отметить оплаченным' ?></button>
-      </form>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <?php if ($order['payment_status'] === 'paid'): ?>
+        <form method="post" class="inline">
+          <?= crm_csrf_field() ?>
+          <input type="hidden" name="action" value="unmark_paid">
+          <button class="btn small secondary" type="submit">Снять отметку оплаты</button>
+        </form>
+      <?php else: ?>
+        <form method="post" class="inline" style="display:flex;gap:6px;align-items:center;">
+          <?= crm_csrf_field() ?>
+          <input type="hidden" name="action" value="mark_paid">
+          <select name="payment_method" required>
+            <option value="">— способ оплаты —</option>
+            <option value="cash">Наличный расчёт</option>
+            <option value="terminal">Оплата через терминал</option>
+            <option value="invoice">Оплата по счёту</option>
+            <option value="online">Онлайн на сайте</option>
+          </select>
+          <button class="btn small secondary" type="submit">Отметить оплаченным</button>
+        </form>
+      <?php endif; ?>
       <a class="btn small" href="/crm/invoice.php?order_id=<?= (int)$order['id'] ?>">Выставить счёт</a>
       <a class="btn small secondary" href="/crm/waybill.php?id=<?= (int)$order['id'] ?>" target="_blank">Печать накладной</a>
     </div>
