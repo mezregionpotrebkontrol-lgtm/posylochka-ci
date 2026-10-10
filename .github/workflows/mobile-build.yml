@@ -37,7 +37,7 @@ jobs:
           # change between Capacitor releases — match by pattern, not by an exact literal,
           # so this step never silently no-ops if the generated default changes.
           sed -i -E 's/versionCode [0-9]+/versionCode ${{ vars.ANDROID_VERSION_CODE || 8 }}/' build.gradle
-          sed -i -E 's/versionName "[^"]*"/versionName "${{ vars.ANDROID_VERSION_NAME || '\''2.1.0'\'' }}"/' build.gradle
+          sed -i -E 's/versionName "[^"]*"/versionName "${{ vars.ANDROID_VERSION_NAME || '2.1.0' }}"/' build.gradle
           echo "--- итоговая версия в build.gradle ---"
           grep -E 'versionCode|versionName' build.gradle
           # Жёсткая проверка: если версия не совпала с ожидаемой — останавливаем сборку,
@@ -105,7 +105,7 @@ jobs:
           # change between Capacitor releases — match by pattern, not by an exact literal,
           # so this step never silently no-ops if the generated default changes.
           sed -i -E 's/versionCode [0-9]+/versionCode ${{ vars.ANDROID_VERSION_CODE || 8 }}/' build.gradle
-          sed -i -E 's/versionName "[^"]*"/versionName "${{ vars.ANDROID_VERSION_NAME || '\''2.1.0'\'' }}"/' build.gradle
+          sed -i -E 's/versionName "[^"]*"/versionName "${{ vars.ANDROID_VERSION_NAME || '2.1.0' }}"/' build.gradle
           echo "--- итоговая версия в build.gradle ---"
           grep -E 'versionCode|versionName' build.gradle
           # Жёсткая проверка: если версия не совпала с ожидаемой — останавливаем сборку,
