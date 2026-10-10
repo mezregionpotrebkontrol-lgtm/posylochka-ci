@@ -80,6 +80,9 @@ CREATE TABLE IF NOT EXISTS orders (
     payment_method ENUM('online','cash','terminal','invoice','installment') DEFAULT NULL,
     is_cod TINYINT(1) NOT NULL DEFAULT 0,
     cod_amount DECIMAL(12,2) DEFAULT NULL,
+    is_insured TINYINT(1) NOT NULL DEFAULT 0,
+    insured_amount DECIMAL(12,2) DEFAULT NULL,
+    insurance_fee DECIMAL(12,2) DEFAULT NULL,
     planned_date DATE DEFAULT NULL,
     comment TEXT DEFAULT NULL,
     recipient_signature LONGTEXT DEFAULT NULL,
@@ -125,6 +128,32 @@ CREATE TABLE IF NOT EXISTS order_packages (
     FOREIGN KEY (scanned_by) REFERENCES users(id) ON DELETE SET NULL,
     INDEX idx_order_packages_order (order_id),
     INDEX idx_order_packages_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==========================================================
+-- Фотофиксация груза при приёме и при вручении
+-- ==========================================================
+CREATE TABLE IF NOT EXISTS order_photos (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    order_id INT UNSIGNED NOT NULL,
+    event ENUM('pickup','delivery') NOT NULL,
+    photo_path VARCHAR(255) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by INT UNSIGNED DEFAULT NULL,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_order_photos_order (order_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==========================================================
+-- Последняя геопозиция курьера (живая карта в трекинге на сайте)
+-- ==========================================================
+CREATE TABLE IF NOT EXISTS courier_locations (
+    courier_id INT UNSIGNED PRIMARY KEY,
+    lat DECIMAL(10,7) NOT NULL,
+    lng DECIMAL(10,7) NOT NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (courier_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==========================================================

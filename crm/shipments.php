@@ -245,7 +245,7 @@ require __DIR__ . '/includes/layout_top.php';
         <td><?= e($o['cargo_description']) ?></td>
         <td><span class="badge <?= crm_order_status_class($o['status']) ?>"><?= e(crm_order_status_label($o['status'])) ?></span></td>
         <td>
-          <form method="post" class="inline" onsubmit="return confirm("\u{423}\u{431}\u{440}\u{430}\u{442}\u{44c} \u{437}\u{430}\u{44f}\u{432}\u{43a}\u{443} \u{438}\u{437} \u{440}\u{435}\u{439}\u{441}\u{430}?");">
+          <form method="post" class="inline" onsubmit='return confirm("\u{423}\u{431}\u{440}\u{430}\u{442}\u{44c} \u{437}\u{430}\u{44f}\u{432}\u{43a}\u{443} \u{438}\u{437} \u{440}\u{435}\u{439}\u{441}\u{430}?");'>
             <?= crm_csrf_field() ?>
             <input type="hidden" name="action" value="remove_order">
             <input type="hidden" name="order_id" value="<?= (int)$o['id'] ?>">

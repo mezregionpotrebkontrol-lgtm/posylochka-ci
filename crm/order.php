@@ -33,12 +33,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
     $placesCount = max(1, (int) ($_POST['places_count'] ?? 1));
     $isCod = !empty($_POST['is_cod']) ? 1 : 0;
     $codAmount = $isCod && $_POST['cod_amount'] !== '' ? (float) $_POST['cod_amount'] : null;
+    $isInsured = !empty($_POST['is_insured']) ? 1 : 0;
+    $insuredAmount = $isInsured && $_POST['insured_amount'] !== '' ? (float) $_POST['insured_amount'] : null;
+    $insuranceFee = $isInsured && $insuredAmount ? crm_insurance_fee($insuredAmount) : null;
     if (!$clientId) {
         crm_flash_set("\u{412}\u{44b}\u{431}\u{435}\u{440}\u{438}\u{442}\u{435} \u{43a}\u{43b}\u{438}\u{435}\u{43d}\u{442}\u{430}.", 'err');
     } else {
         $stmt = $pdo->prepare('INSERT INTO orders
-            (client_id, created_by, from_city, to_city, from_address, to_address, cargo_description, weight_kg, places_count, declared_value, price, planned_date, comment, pickup_type, is_cod, cod_amount, status)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,\'new\')');
+            (client_id, created_by, from_city, to_city, from_address, to_address, cargo_description, weight_kg, places_count, declared_value, price, planned_date, comment, pickup_type, is_cod, cod_amount, is_insured, insured_amount, insurance_fee, status)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,\'new\')');
         $stmt->execute([
             $clientId,
             $user['id'],
@@ -56,6 +59,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
             $pickupType,
             $isCod,
             $codAmount,
+            $isInsured,
+            $insuredAmount,
+            $insuranceFee,
         ]);
         $newId = (int) $pdo->lastInsertId();
         $pdo->prepare("INSERT INTO order_status_history (order_id, status, changed_by, comment) VALUES (?, 'new', ?, '\u{417}\u{430}\u{44f}\u{432}\u{43a}\u{430} \u{441}\u{43e}\u{437}\u{434}\u{430}\u{43d}\u{430}')")
@@ -73,7 +79,10 @@ if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') 
     $placesCount = max(1, (int) ($_POST['places_count'] ?? 1));
     $isCod = !empty($_POST['is_cod']) ? 1 : 0;
     $codAmount = $isCod && $_POST['cod_amount'] !== '' ? (float) $_POST['cod_amount'] : null;
-    $stmt = $pdo->prepare('UPDATE orders SET from_city=?, to_city=?, from_address=?, to_address=?, cargo_description=?, weight_kg=?, places_count=?, declared_value=?, price=?, planned_date=?, comment=?, pickup_type=?, is_cod=?, cod_amount=? WHERE id=?');
+    $isInsured = !empty($_POST['is_insured']) ? 1 : 0;
+    $insuredAmount = $isInsured && $_POST['insured_amount'] !== '' ? (float) $_POST['insured_amount'] : null;
+    $insuranceFee = $isInsured && $insuredAmount ? crm_insurance_fee($insuredAmount) : null;
+    $stmt = $pdo->prepare('UPDATE orders SET from_city=?, to_city=?, from_address=?, to_address=?, cargo_description=?, weight_kg=?, places_count=?, declared_value=?, price=?, planned_date=?, comment=?, pickup_type=?, is_cod=?, cod_amount=?, is_insured=?, insured_amount=?, insurance_fee=? WHERE id=?');
     $stmt->execute([
         trim($_POST['from_city'] ?? '') ?: "\u{414}\u{435}\u{440}\u{431}\u{435}\u{43d}\u{442}",
         trim($_POST['to_city'] ?? '') ?: "\u{421}\u{430}\u{43d}\u{43a}\u{442}-\u{41f}\u{435}\u{442}\u{435}\u{440}\u{431}\u{443}\u{440}\u{433}",
@@ -89,6 +98,9 @@ if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') 
         $pickupType,
         $isCod,
         $codAmount,
+        $isInsured,
+        $insuredAmount,
+        $insuranceFee,
         $id,
     ]);
     crm_ensure_order_packages($pdo, $id, $placesCount);
@@ -130,10 +142,29 @@ if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') 
         $pdo->prepare('INSERT INTO order_status_history (order_id, status, changed_by, comment) VALUES (?,?,?,?)')
             ->execute([$id, $newStatus, $user['id'], trim($_POST['status_comment'] ?? '') ?: null]);
         crm_notify_client_status($pdo, $order, $newStatus);
+        if ($newStatus === 'collecting' && !empty($_FILES['pickup_photos'])) {
+            crm_save_order_photos($pdo, $id, 'pickup', $_FILES['pickup_photos'], $user['id']);
+        }
+        if ($newStatus === 'delivered' && !empty($_FILES['delivery_photos'])) {
+            crm_save_order_photos($pdo, $id, 'delivery', $_FILES['delivery_photos'], $user['id']);
+        }
         if ($newStatus === 'delivered') {
             crm_notify_owner("\u{417}\u{430}\u{44f}\u{432}\u{43a}\u{430} \u{2116}" . $id . ' (' . $order['from_city'] . " \u{2192} " . $order['to_city'] . ") \u{43e}\u{442}\u{43c}\u{435}\u{447}\u{435}\u{43d}\u{430} \u{43a}\u{430}\u{43a} \u{434}\u{43e}\u{441}\u{442}\u{430}\u{432}\u{43b}\u{435}\u{43d}\u{43d}\u{430}\u{44f}.");
         }
         crm_flash_set("\u{421}\u{442}\u{430}\u{442}\u{443}\u{441} \u{438}\u{437}\u{43c}\u{435}\u{43d}\u{451}\u{43d} \u{43d}\u{430} \u{ab}" . crm_order_status_label($newStatus) . "\u{bb}.");
+    }
+    crm_redirect('/crm/order.php?id=' . $id);
+}
+
+// &#x420;&#x443;&#x447;&#x43d;&#x430;&#x44f; &#x437;&#x430;&#x433;&#x440;&#x443;&#x437;&#x43a;&#x430; &#x444;&#x43e;&#x442;&#x43e; &#x433;&#x440;&#x443;&#x437;&#x430; &#x432;&#x43d;&#x435; &#x441;&#x43c;&#x435;&#x43d;&#x44b; &#x441;&#x442;&#x430;&#x442;&#x443;&#x441;&#x430; (&#x43d;&#x430;&#x43f;&#x440;&#x438;&#x43c;&#x435;&#x440;, &#x43d;&#x430; &#x441;&#x43a;&#x43b;&#x430;&#x434;&#x435;).
+if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'upload_photos') {
+    crm_csrf_check();
+    $event = ($_POST['photo_event'] ?? '') === 'delivery' ? 'delivery' : 'pickup';
+    $savedCount = !empty($_FILES['photos']) ? crm_save_order_photos($pdo, $id, $event, $_FILES['photos'], $user['id']) : 0;
+    if ($savedCount > 0) {
+        crm_flash_set("\u{414}\u{43e}\u{431}\u{430}\u{432}\u{43b}\u{435}\u{43d}\u{43e} \u{444}\u{43e}\u{442}\u{43e}: {$savedCount}.");
+    } else {
+        crm_flash_set("\u{41d}\u{435} \u{443}\u{434}\u{430}\u{43b}\u{43e}\u{441}\u{44c} \u{437}\u{430}\u{433}\u{440}\u{443}\u{437}\u{438}\u{442}\u{44c} \u{444}\u{43e}\u{442}\u{43e}. \u{41f}\u{440}\u{43e}\u{432}\u{435}\u{440}\u{44c}\u{442}\u{435} \u{444}\u{43e}\u{440}\u{43c}\u{430}\u{442} (PNG/JPEG/WEBP) \u{438} \u{440}\u{430}\u{437}\u{43c}\u{435}\u{440} (\u{434}\u{43e} 8 \u{41c}\u{411}).", 'err');
     }
     crm_redirect('/crm/order.php?id=' . $id);
 }
@@ -305,10 +336,22 @@ if ($order) {
 }
 
 $orderPackages = [];
+$orderPhotosPickup = [];
+$orderPhotosDelivery = [];
 if ($order) {
     $pkgStmt = $pdo->prepare('SELECT * FROM order_packages WHERE order_id = ? ORDER BY seq');
     $pkgStmt->execute([$id]);
     $orderPackages = $pkgStmt->fetchAll();
+
+    $photoStmt = $pdo->prepare('SELECT * FROM order_photos WHERE order_id = ? ORDER BY created_at');
+    $photoStmt->execute([$id]);
+    foreach ($photoStmt->fetchAll() as $photo) {
+        if ($photo['event'] === 'pickup') {
+            $orderPhotosPickup[] = $photo;
+        } else {
+            $orderPhotosDelivery[] = $photo;
+        }
+    }
 }
 
 $currentRun = null;
@@ -376,6 +419,13 @@ require __DIR__ . '/includes/layout_top.php';
         <label for="create_is_cod" style="margin:0;">&#x41d;&#x430;&#x43b;&#x43e;&#x436;&#x435;&#x43d;&#x43d;&#x44b;&#x439; &#x43f;&#x43b;&#x430;&#x442;&#x451;&#x436;</label>
       </div>
       <div id="create_cod_amount_wrap" style="display:none;"><label>&#x421;&#x443;&#x43c;&#x43c;&#x430; &#x43a; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x44e;, &#x20bd;</label><input type="number" step="0.01" name="cod_amount"></div>
+    </div>
+    <div class="form-row" style="align-items:center;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="create_is_insured" name="is_insured" value="1" onchange="document.getElementById('create_insured_amount_wrap').style.display = this.checked ? 'block' : 'none';">
+        <label for="create_is_insured" style="margin:0;">&#x417;&#x430;&#x441;&#x442;&#x440;&#x430;&#x445;&#x43e;&#x432;&#x430;&#x442;&#x44c; &#x433;&#x440;&#x443;&#x437;</label>
+      </div>
+      <div id="create_insured_amount_wrap" style="display:none;"><label>&#x421;&#x442;&#x440;&#x430;&#x445;&#x43e;&#x432;&#x430;&#x44f; &#x441;&#x443;&#x43c;&#x43c;&#x430;, &#x20bd; (&#x441;&#x442;&#x440;&#x430;&#x445;&#x43e;&#x432;&#x43a;&#x430; &#x2014; 1%, &#x43c;&#x438;&#x43d;&#x438;&#x43c;&#x443;&#x43c; 100 &#x20bd;)</label><input type="number" step="0.01" name="insured_amount"></div>
     </div>
     <label>&#x41a;&#x43e;&#x43c;&#x43c;&#x435;&#x43d;&#x442;&#x430;&#x440;&#x438;&#x439;</label>
     <textarea name="comment"></textarea>
@@ -474,7 +524,7 @@ require __DIR__ . '/includes/layout_top.php';
                 <input type="hidden" name="installment_id" value="<?= (int) $inst['id'] ?>">
                 <button class="btn small secondary" type="submit">&#x41e;&#x442;&#x43c;&#x435;&#x442;&#x438;&#x442;&#x44c; &#x43e;&#x43f;&#x43b;&#x430;&#x447;&#x435;&#x43d;&#x43d;&#x44b;&#x43c;</button>
               </form>
-              <form method="post" class="inline" onsubmit="return confirm("\u{423}\u{434}\u{430}\u{43b}\u{438}\u{442}\u{44c} \u{43f}\u{43b}\u{430}\u{442}\u{451}\u{436} \u{438}\u{437} \u{433}\u{440}\u{430}\u{444}\u{438}\u{43a}\u{430}?");">
+              <form method="post" class="inline" onsubmit='return confirm("\u{423}\u{434}\u{430}\u{43b}\u{438}\u{442}\u{44c} \u{43f}\u{43b}\u{430}\u{442}\u{451}\u{436} \u{438}\u{437} \u{433}\u{440}\u{430}\u{444}\u{438}\u{43a}\u{430}?");'>
                 <?= crm_csrf_field() ?>
                 <input type="hidden" name="action" value="delete_installment">
                 <input type="hidden" name="installment_id" value="<?= (int) $inst['id'] ?>">
@@ -545,6 +595,13 @@ require __DIR__ . '/includes/layout_top.php';
       </div>
       <div id="update_cod_amount_wrap" style="<?= !empty($order['is_cod']) ? '' : 'display:none;' ?>"><label>&#x421;&#x443;&#x43c;&#x43c;&#x430; &#x43a; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x44e;, &#x20bd;</label><input type="number" step="0.01" name="cod_amount" value="<?= e($order['cod_amount']) ?>"></div>
     </div>
+    <div class="form-row" style="align-items:center;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="update_is_insured" name="is_insured" value="1" <?= !empty($order['is_insured']) ? 'checked' : '' ?> onchange="document.getElementById('update_insured_amount_wrap').style.display = this.checked ? 'block' : 'none';">
+        <label for="update_is_insured" style="margin:0;">&#x417;&#x430;&#x441;&#x442;&#x440;&#x430;&#x445;&#x43e;&#x432;&#x430;&#x442;&#x44c; &#x433;&#x440;&#x443;&#x437;</label>
+      </div>
+      <div id="update_insured_amount_wrap" style="<?= !empty($order['is_insured']) ? '' : 'display:none;' ?>"><label>&#x421;&#x442;&#x440;&#x430;&#x445;&#x43e;&#x432;&#x430;&#x44f; &#x441;&#x443;&#x43c;&#x43c;&#x430;, &#x20bd; (&#x441;&#x442;&#x440;&#x430;&#x445;&#x43e;&#x432;&#x43a;&#x430; &#x2014; 1%, &#x43c;&#x438;&#x43d;&#x438;&#x43c;&#x443;&#x43c; 100 &#x20bd;)</label><input type="number" step="0.01" name="insured_amount" value="<?= e($order['insured_amount']) ?>"></div>
+    </div>
     <label>&#x41a;&#x43e;&#x43c;&#x43c;&#x435;&#x43d;&#x442;&#x430;&#x440;&#x438;&#x439;</label>
     <textarea name="comment"><?= e($order['comment']) ?></textarea>
     <div class="form-actions"><button class="btn" type="submit">&#x421;&#x43e;&#x445;&#x440;&#x430;&#x43d;&#x438;&#x442;&#x44c; &#x438;&#x437;&#x43c;&#x435;&#x43d;&#x435;&#x43d;&#x438;&#x44f;</button></div>
@@ -583,6 +640,36 @@ require __DIR__ . '/includes/layout_top.php';
     <?php if ($codLink): ?>
       <p class="text-muted" style="margin-top:10px;">&#x41f;&#x43e;&#x441;&#x43b;&#x435;&#x434;&#x43d;&#x44f;&#x44f; &#x441;&#x43e;&#x437;&#x434;&#x430;&#x43d;&#x43d;&#x430;&#x44f; &#x441;&#x441;&#x44b;&#x43b;&#x43a;&#x430; &#x43d;&#x430; &#x43e;&#x43f;&#x43b;&#x430;&#x442;&#x443; (&#x441;&#x442;&#x430;&#x442;&#x443;&#x441;: <?= e($codLink['status']) ?>): <a href="<?= e($codLink['confirmation_url']) ?>" target="_blank"><?= e($codLink['confirmation_url']) ?></a></p>
     <?php endif; ?>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php if (!empty($order['is_insured'])): ?>
+<div class="card">
+  <h3 style="margin-top:0;">&#x421;&#x442;&#x440;&#x430;&#x445;&#x43e;&#x432;&#x430;&#x43d;&#x438;&#x435; &#x433;&#x440;&#x443;&#x437;&#x430;</h3>
+  <p>&#x421;&#x442;&#x440;&#x430;&#x445;&#x43e;&#x432;&#x430;&#x44f; &#x441;&#x443;&#x43c;&#x43c;&#x430;: <strong><?= crm_money((float) ($order['insured_amount'] ?? 0)) ?></strong><br>
+    &#x421;&#x442;&#x43e;&#x438;&#x43c;&#x43e;&#x441;&#x442;&#x44c; &#x441;&#x442;&#x440;&#x430;&#x445;&#x43e;&#x432;&#x43a;&#x438;: <strong><?= crm_money((float) ($order['insurance_fee'] ?? 0)) ?></strong></p>
+</div>
+<?php endif; ?>
+
+<?php if ($orderPhotosPickup || $orderPhotosDelivery): ?>
+<div class="card">
+  <h3 style="margin-top:0;">&#x424;&#x43e;&#x442;&#x43e;&#x444;&#x438;&#x43a;&#x441;&#x430;&#x446;&#x438;&#x44f; &#x433;&#x440;&#x443;&#x437;&#x430;</h3>
+  <?php if ($orderPhotosPickup): ?>
+    <p class="text-muted" style="margin-bottom:6px;">&#x41f;&#x440;&#x438; &#x43f;&#x440;&#x438;&#x451;&#x43c;&#x435;</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+      <?php foreach ($orderPhotosPickup as $photo): ?>
+        <a href="/<?= e($photo['photo_path']) ?>" target="_blank"><img src="/<?= e($photo['photo_path']) ?>" alt="&#x424;&#x43e;&#x442;&#x43e; &#x43f;&#x440;&#x438; &#x43f;&#x440;&#x438;&#x451;&#x43c;&#x435;" style="width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid #ddd;"></a>
+      <?php endforeach; ?>
+    </div>
+  <?php endif; ?>
+  <?php if ($orderPhotosDelivery): ?>
+    <p class="text-muted" style="margin-bottom:6px;">&#x41f;&#x440;&#x438; &#x432;&#x440;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x438;</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <?php foreach ($orderPhotosDelivery as $photo): ?>
+        <a href="/<?= e($photo['photo_path']) ?>" target="_blank"><img src="/<?= e($photo['photo_path']) ?>" alt="&#x424;&#x43e;&#x442;&#x43e; &#x43f;&#x440;&#x438; &#x432;&#x440;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x438;" style="width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid #ddd;"></a>
+      <?php endforeach; ?>
+    </div>
   <?php endif; ?>
 </div>
 <?php endif; ?>
@@ -661,12 +748,12 @@ require __DIR__ . '/includes/layout_top.php';
 
 <div class="card">
   <h3 style="margin-top:0;">&#x418;&#x437;&#x43c;&#x435;&#x43d;&#x438;&#x442;&#x44c; &#x441;&#x442;&#x430;&#x442;&#x443;&#x441;</h3>
-  <form method="post" class="form-row" style="align-items:end;">
+  <form method="post" class="form-row" style="align-items:end;" enctype="multipart/form-data">
     <?= crm_csrf_field() ?>
     <input type="hidden" name="action" value="change_status">
     <div>
       <label>&#x41d;&#x43e;&#x432;&#x44b;&#x439; &#x441;&#x442;&#x430;&#x442;&#x443;&#x441;</label>
-      <select name="status">
+      <select name="status" onchange="document.getElementById('cs_pickup_photos_wrap').style.display = this.value === 'collecting' ? 'block' : 'none'; document.getElementById('cs_delivery_photos_wrap').style.display = this.value === 'delivered' ? 'block' : 'none';">
         <?php foreach (['new','accepted','collecting','in_transit','delivered','cancelled'] as $s): ?>
           <option value="<?= $s ?>" <?= $order['status'] === $s ? 'selected' : '' ?>><?= e(crm_order_status_label($s)) ?></option>
         <?php endforeach; ?>
@@ -676,7 +763,32 @@ require __DIR__ . '/includes/layout_top.php';
       <label>&#x41a;&#x43e;&#x43c;&#x43c;&#x435;&#x43d;&#x442;&#x430;&#x440;&#x438;&#x439; (&#x43d;&#x435;&#x43e;&#x431;&#x44f;&#x437;&#x430;&#x442;&#x435;&#x43b;&#x44c;&#x43d;&#x43e;)</label>
       <input type="text" name="status_comment">
     </div>
+    <div id="cs_pickup_photos_wrap" style="<?= $order['status'] === 'collecting' ? '' : 'display:none;' ?>">
+      <label>&#x424;&#x43e;&#x442;&#x43e; &#x43f;&#x440;&#x438; &#x43f;&#x440;&#x438;&#x451;&#x43c;&#x435; (&#x43d;&#x435;&#x43e;&#x431;&#x44f;&#x437;&#x430;&#x442;&#x435;&#x43b;&#x44c;&#x43d;&#x43e;)</label>
+      <input type="file" name="pickup_photos[]" accept="image/*" capture="environment" multiple>
+    </div>
+    <div id="cs_delivery_photos_wrap" style="<?= $order['status'] === 'delivered' ? '' : 'display:none;' ?>">
+      <label>&#x424;&#x43e;&#x442;&#x43e; &#x43f;&#x440;&#x438; &#x432;&#x440;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x438; (&#x43d;&#x435;&#x43e;&#x431;&#x44f;&#x437;&#x430;&#x442;&#x435;&#x43b;&#x44c;&#x43d;&#x43e;)</label>
+      <input type="file" name="delivery_photos[]" accept="image/*" capture="environment" multiple>
+    </div>
     <div class="form-actions"><button class="btn secondary" type="submit">&#x41e;&#x431;&#x43d;&#x43e;&#x432;&#x438;&#x442;&#x44c; &#x441;&#x442;&#x430;&#x442;&#x443;&#x441;</button></div>
+  </form>
+
+  <form method="post" class="form-row" style="align-items:end;margin-top:12px;" enctype="multipart/form-data">
+    <?= crm_csrf_field() ?>
+    <input type="hidden" name="action" value="upload_photos">
+    <div>
+      <label>&#x414;&#x43e;&#x431;&#x430;&#x432;&#x438;&#x442;&#x44c; &#x444;&#x43e;&#x442;&#x43e; &#x431;&#x435;&#x437; &#x441;&#x43c;&#x435;&#x43d;&#x44b; &#x441;&#x442;&#x430;&#x442;&#x443;&#x441;&#x430;</label>
+      <select name="photo_event">
+        <option value="pickup">&#x41f;&#x440;&#x438; &#x43f;&#x440;&#x438;&#x451;&#x43c;&#x435;</option>
+        <option value="delivery">&#x41f;&#x440;&#x438; &#x432;&#x440;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x438;</option>
+      </select>
+    </div>
+    <div>
+      <label>&#x424;&#x43e;&#x442;&#x43e;</label>
+      <input type="file" name="photos[]" accept="image/*" capture="environment" multiple>
+    </div>
+    <div class="form-actions"><button class="btn small secondary" type="submit">&#x417;&#x430;&#x433;&#x440;&#x443;&#x437;&#x438;&#x442;&#x44c;</button></div>
   </form>
 
   <?php if ($history): ?>

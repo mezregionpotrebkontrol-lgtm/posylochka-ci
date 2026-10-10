@@ -310,3 +310,74 @@ function crm_phone_digits(?string $phone): ?string
     }
     return $digits;
 }
+
+/**
+ * &#x421;&#x442;&#x43e;&#x438;&#x43c;&#x43e;&#x441;&#x442;&#x44c; &#x441;&#x442;&#x440;&#x430;&#x445;&#x43e;&#x432;&#x43a;&#x438; &#x433;&#x440;&#x443;&#x437;&#x430;: 1% &#x43e;&#x442; &#x441;&#x442;&#x440;&#x430;&#x445;&#x43e;&#x432;&#x43e;&#x439; &#x441;&#x443;&#x43c;&#x43c;&#x44b;, &#x43d;&#x43e; &#x43d;&#x435; &#x43c;&#x435;&#x43d;&#x435;&#x435; 100 &#x440;&#x443;&#x431;.
+ * &#x41f;&#x440;&#x43e;&#x441;&#x442;&#x430;&#x44f; &#x444;&#x438;&#x43a;&#x441;&#x438;&#x440;&#x43e;&#x432;&#x430;&#x43d;&#x43d;&#x430;&#x44f; &#x444;&#x43e;&#x440;&#x43c;&#x443;&#x43b;&#x430; &#x2014; &#x435;&#x441;&#x43b;&#x438; &#x43d;&#x443;&#x436;&#x43d;&#x430; &#x434;&#x440;&#x443;&#x433;&#x430;&#x44f;, &#x43c;&#x43e;&#x436;&#x43d;&#x43e; &#x432;&#x44b;&#x43d;&#x435;&#x441;&#x442;&#x438; &#x432;
+ * pricing_config &#x43f;&#x43e; &#x430;&#x43d;&#x430;&#x43b;&#x43e;&#x433;&#x438;&#x438; &#x441; &#x43e;&#x441;&#x442;&#x430;&#x43b;&#x44c;&#x43d;&#x44b;&#x43c;&#x438; &#x442;&#x430;&#x440;&#x438;&#x444;&#x430;&#x43c;&#x438;.
+ */
+function crm_insurance_fee(float $insuredAmount): float
+{
+    if ($insuredAmount <= 0) {
+        return 0.0;
+    }
+    return max(100.0, round($insuredAmount * 0.01, 2));
+}
+
+function crm_insurance_label(bool $isInsured): string
+{
+    return $isInsured ? "\u{413}\u{440}\u{443}\u{437} \u{437}\u{430}\u{441}\u{442}\u{440}\u{430}\u{445}\u{43e}\u{432}\u{430}\u{43d}" : "\u{2014}";
+}
+
+function crm_photo_event_label(string $event): string
+{
+    return [
+        'pickup'   => "\u{41f}\u{440}\u{438}\u{451}\u{43c} \u{433}\u{440}\u{443}\u{437}\u{430}",
+        'delivery' => "\u{412}\u{440}\u{443}\u{447}\u{435}\u{43d}\u{438}\u{435}",
+    ][$event] ?? $event;
+}
+
+/**
+ * &#x421;&#x43e;&#x445;&#x440;&#x430;&#x43d;&#x44f;&#x435;&#x442; &#x444;&#x43e;&#x442;&#x43e; &#x43f;&#x440;&#x438;&#x451;&#x43c;&#x430;/&#x432;&#x440;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x44f; &#x433;&#x440;&#x443;&#x437;&#x430; &#x438;&#x437; $_FILES-&#x43f;&#x43e;&#x434;&#x43c;&#x430;&#x441;&#x441;&#x438;&#x432;&#x430; (&#x43a;&#x43b;&#x44e;&#x447; &#x441;
+ * &#x43c;&#x43d;&#x43e;&#x436;&#x435;&#x441;&#x442;&#x432;&#x435;&#x43d;&#x43d;&#x43e;&#x439; &#x437;&#x430;&#x433;&#x440;&#x443;&#x437;&#x43a;&#x43e;&#x439;, &#x43d;&#x430;&#x43f;&#x440;&#x438;&#x43c;&#x435;&#x440; $_FILES['pickup_photos']) &#x432;
+ * uploads/order-photos &#x438; &#x441;&#x43e;&#x437;&#x434;&#x430;&#x451;&#x442; &#x441;&#x442;&#x440;&#x43e;&#x43a;&#x438; &#x432; order_photos. &#x41c;&#x43e;&#x43b;&#x447;&#x430;
+ * &#x438;&#x433;&#x43d;&#x43e;&#x440;&#x438;&#x440;&#x443;&#x435;&#x442; &#x444;&#x430;&#x439;&#x43b;&#x44b;, &#x43a;&#x43e;&#x442;&#x43e;&#x440;&#x44b;&#x435; &#x43d;&#x435; &#x43f;&#x440;&#x43e;&#x448;&#x43b;&#x438; &#x43f;&#x440;&#x43e;&#x432;&#x435;&#x440;&#x43a;&#x443; (&#x43d;&#x435; &#x438;&#x437;&#x43e;&#x431;&#x440;&#x430;&#x436;&#x435;&#x43d;&#x438;&#x435;,
+ * &#x441;&#x43b;&#x438;&#x448;&#x43a;&#x43e;&#x43c; &#x431;&#x43e;&#x43b;&#x44c;&#x448;&#x438;&#x435;) &#x2014; &#x43e;&#x434;&#x43d;&#x43e; &#x43f;&#x43b;&#x43e;&#x445;&#x43e;&#x435; &#x444;&#x43e;&#x442;&#x43e; &#x43d;&#x435; &#x434;&#x43e;&#x43b;&#x436;&#x43d;&#x43e; &#x431;&#x43b;&#x43e;&#x43a;&#x438;&#x440;&#x43e;&#x432;&#x430;&#x442;&#x44c; &#x441;&#x43c;&#x435;&#x43d;&#x443;
+ * &#x441;&#x442;&#x430;&#x442;&#x443;&#x441;&#x430; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x438;. &#x412;&#x43e;&#x437;&#x432;&#x440;&#x430;&#x449;&#x430;&#x435;&#x442; &#x43a;&#x43e;&#x43b;&#x438;&#x447;&#x435;&#x441;&#x442;&#x432;&#x43e; &#x443;&#x441;&#x43f;&#x435;&#x448;&#x43d;&#x43e; &#x441;&#x43e;&#x445;&#x440;&#x430;&#x43d;&#x451;&#x43d;&#x43d;&#x44b;&#x445; &#x444;&#x43e;&#x442;&#x43e;.
+ */
+function crm_save_order_photos(PDO $pdo, int $orderId, string $event, array $filesField, int $userId): int
+{
+    if (empty($filesField['tmp_name']) || !is_array($filesField['tmp_name'])) {
+        return 0;
+    }
+    $allowed = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/webp' => 'webp'];
+    $maxBytes = 8 * 1024 * 1024;
+    $dir = __DIR__ . '/../../uploads/order-photos';
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0755, true);
+    }
+    $saved = 0;
+    $count = count($filesField['tmp_name']);
+    for ($i = 0; $i < $count; $i++) {
+        $tmpName = $filesField['tmp_name'][$i] ?? '';
+        $size = $filesField['size'][$i] ?? 0;
+        $error = $filesField['error'][$i] ?? UPLOAD_ERR_NO_FILE;
+        if ($error !== UPLOAD_ERR_OK || $tmpName === '' || !is_uploaded_file($tmpName)) {
+            continue;
+        }
+        if ($size > $maxBytes) {
+            continue;
+        }
+        $mime = @mime_content_type($tmpName) ?: '';
+        if (!isset($allowed[$mime])) {
+            continue;
+        }
+        $filename = 'order' . $orderId . '_' . $event . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $allowed[$mime];
+        if (@move_uploaded_file($tmpName, $dir . '/' . $filename)) {
+            $pdo->prepare('INSERT INTO order_photos (order_id, event, photo_path, created_by) VALUES (?,?,?,?)')
+                ->execute([$orderId, $event, 'uploads/order-photos/' . $filename, $userId]);
+            $saved++;
+        }
+    }
+    return $saved;
+}

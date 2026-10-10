@@ -1,12 +1,12 @@
 <?php
 /**
- * Печатная накладная на отправление + квитанция клиента, автозаполняется
- * данными конкретной заявки (orders + clients). Открывается из карточки
- * заявки (order.php) кнопкой «Печать накладной», сама печать — штатным
- * window.print() браузера, отдельный PDF-файл генерировать не нужно.
+ * &#x41f;&#x435;&#x447;&#x430;&#x442;&#x43d;&#x430;&#x44f; &#x43d;&#x430;&#x43a;&#x43b;&#x430;&#x434;&#x43d;&#x430;&#x44f; &#x43d;&#x430; &#x43e;&#x442;&#x43f;&#x440;&#x430;&#x432;&#x43b;&#x435;&#x43d;&#x438;&#x435; + &#x43a;&#x432;&#x438;&#x442;&#x430;&#x43d;&#x446;&#x438;&#x44f; &#x43a;&#x43b;&#x438;&#x435;&#x43d;&#x442;&#x430;, &#x430;&#x432;&#x442;&#x43e;&#x437;&#x430;&#x43f;&#x43e;&#x43b;&#x43d;&#x44f;&#x435;&#x442;&#x441;&#x44f;
+ * &#x434;&#x430;&#x43d;&#x43d;&#x44b;&#x43c;&#x438; &#x43a;&#x43e;&#x43d;&#x43a;&#x440;&#x435;&#x442;&#x43d;&#x43e;&#x439; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x438; (orders + clients). &#x41e;&#x442;&#x43a;&#x440;&#x44b;&#x432;&#x430;&#x435;&#x442;&#x441;&#x44f; &#x438;&#x437; &#x43a;&#x430;&#x440;&#x442;&#x43e;&#x447;&#x43a;&#x438;
+ * &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x438; (order.php) &#x43a;&#x43d;&#x43e;&#x43f;&#x43a;&#x43e;&#x439; &#xab;&#x41f;&#x435;&#x447;&#x430;&#x442;&#x44c; &#x43d;&#x430;&#x43a;&#x43b;&#x430;&#x434;&#x43d;&#x43e;&#x439;&#xbb;, &#x441;&#x430;&#x43c;&#x430; &#x43f;&#x435;&#x447;&#x430;&#x442;&#x44c; &#x2014; &#x448;&#x442;&#x430;&#x442;&#x43d;&#x44b;&#x43c;
+ * window.print() &#x431;&#x440;&#x430;&#x443;&#x437;&#x435;&#x440;&#x430;, &#x43e;&#x442;&#x434;&#x435;&#x43b;&#x44c;&#x43d;&#x44b;&#x439; PDF-&#x444;&#x430;&#x439;&#x43b; &#x433;&#x435;&#x43d;&#x435;&#x440;&#x438;&#x440;&#x43e;&#x432;&#x430;&#x442;&#x44c; &#x43d;&#x435; &#x43d;&#x443;&#x436;&#x43d;&#x43e;.
  */
 require_once __DIR__ . '/includes/bootstrap.php';
-$user = crm_require_role(['admin', 'operator']);
+require_once __DIR__ . '/includes/clientapi.php';
 $pdo = crm_db();
 
 $id = (int) ($_GET['id'] ?? 0);
@@ -16,15 +16,29 @@ $stmt->execute([$id]);
 $order = $stmt->fetch();
 if (!$order) {
     http_response_code(404);
-    die('Заявка не найдена.');
+    die("\u{417}\u{430}\u{44f}\u{432}\u{43a}\u{430} \u{43d}\u{435} \u{43d}\u{430}\u{439}\u{434}\u{435}\u{43d}\u{430}.");
 }
 
-$trackLabel = $order['track_code'] ?: ('№' . $order['id']);
+// &#x41d;&#x430;&#x43a;&#x43b;&#x430;&#x434;&#x43d;&#x443;&#x44e; &#x43c;&#x43e;&#x436;&#x435;&#x442; &#x43e;&#x442;&#x43a;&#x440;&#x44b;&#x442;&#x44c; &#x43b;&#x438;&#x431;&#x43e; &#x441;&#x43e;&#x442;&#x440;&#x443;&#x434;&#x43d;&#x438;&#x43a; (&#x43a;&#x430;&#x43a; &#x440;&#x430;&#x43d;&#x44c;&#x448;&#x435;), &#x43b;&#x438;&#x431;&#x43e; &#x43a;&#x43b;&#x438;&#x435;&#x43d;&#x442; &#x438;&#x437;
+// &#x43b;&#x438;&#x447;&#x43d;&#x43e;&#x433;&#x43e; &#x43a;&#x430;&#x431;&#x438;&#x43d;&#x435;&#x442;&#x430; &#x43d;&#x430; &#x441;&#x430;&#x439;&#x442;&#x435; &#x2014; &#x442;&#x43e;&#x43b;&#x44c;&#x43a;&#x43e; &#x43f;&#x43e; &#x441;&#x432;&#x43e;&#x435;&#x439; &#x441;&#x43e;&#x431;&#x441;&#x442;&#x432;&#x435;&#x43d;&#x43d;&#x43e;&#x439; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x435;.
+$employee = crm_current_user();
+if ($employee && !in_array($employee['role'], ['admin', 'operator', 'courier'], true)) {
+    $employee = null;
+}
+if (!$employee) {
+    $client = capi_current_client($pdo);
+    if (!$client || (int) $client['id'] !== (int) $order['client_id']) {
+        http_response_code(403);
+        die("\u{414}\u{43e}\u{441}\u{442}\u{443}\u{43f} \u{437}\u{430}\u{43f}\u{440}\u{435}\u{449}\u{451}\u{43d}.");
+    }
+}
+
+$trackLabel = $order['track_code'] ?: ("\u{2116}" . $order['id']);
 $service = $order['service'] ?? '';
 
 function wb_check(bool $on): string
 {
-    return $on ? '☑' : '☐';
+    return $on ? "\u{2611}" : "\u{2610}";
 }
 ?>
 <!doctype html>
@@ -32,7 +46,7 @@ function wb_check(bool $on): string
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Накладная — заявка №<?= (int) $order['id'] ?></title>
+<title>&#x41d;&#x430;&#x43a;&#x43b;&#x430;&#x434;&#x43d;&#x430;&#x44f; &#x2014; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x430; &#x2116;<?= (int) $order['id'] ?></title>
 <style>
   :root{--brand:#0a2472;}
   *{box-sizing:border-box;}
@@ -90,117 +104,117 @@ function wb_check(bool $on): string
 <body>
 
 <div class="no-print">
-  <button onclick="window.print()">🖨 Печать</button>
-  <a href="/crm/order.php?id=<?= (int) $order['id'] ?>" style="margin-left:12px;">← Назад к заявке</a>
+  <button onclick="window.print()">&#x1f5a8; &#x41f;&#x435;&#x447;&#x430;&#x442;&#x44c;</button>
+  <a href="/crm/order.php?id=<?= (int) $order['id'] ?>" style="margin-left:12px;">&#x2190; &#x41d;&#x430;&#x437;&#x430;&#x434; &#x43a; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x435;</a>
 </div>
 
 <div class="sheet">
   <div class="head">
     <div>
-      <div class="brand">ПОСЫЛОЧКА</div>
-      <div class="tagline">Доставка с температурным режимом · Дербент — Санкт-Петербург, Москва, вся Россия</div>
+      <div class="brand">&#x41f;&#x41e;&#x421;&#x42b;&#x41b;&#x41e;&#x427;&#x41a;&#x410;</div>
+      <div class="tagline">&#x414;&#x43e;&#x441;&#x442;&#x430;&#x432;&#x43a;&#x430; &#x441; &#x442;&#x435;&#x43c;&#x43f;&#x435;&#x440;&#x430;&#x442;&#x443;&#x440;&#x43d;&#x44b;&#x43c; &#x440;&#x435;&#x436;&#x438;&#x43c;&#x43e;&#x43c; &#xb7; &#x414;&#x435;&#x440;&#x431;&#x435;&#x43d;&#x442; &#x2014; &#x421;&#x430;&#x43d;&#x43a;&#x442;-&#x41f;&#x435;&#x442;&#x435;&#x440;&#x431;&#x443;&#x440;&#x433;, &#x41c;&#x43e;&#x441;&#x43a;&#x432;&#x430;, &#x432;&#x441;&#x44f; &#x420;&#x43e;&#x441;&#x441;&#x438;&#x44f;</div>
     </div>
     <div class="contacts">
-      ИП Казаченко Наталия Николаевна<br>
-      Тел.: +7 (812) 711-18-19<br>
-      моя-посылочка.рф
+      &#x418;&#x41f; &#x41a;&#x430;&#x437;&#x430;&#x447;&#x435;&#x43d;&#x43a;&#x43e; &#x41d;&#x430;&#x442;&#x430;&#x43b;&#x438;&#x44f; &#x41d;&#x438;&#x43a;&#x43e;&#x43b;&#x430;&#x435;&#x432;&#x43d;&#x430;<br>
+      &#x422;&#x435;&#x43b;.: +7 (812) 711-18-19<br>
+      &#x43c;&#x43e;&#x44f;-&#x43f;&#x43e;&#x441;&#x44b;&#x43b;&#x43e;&#x447;&#x43a;&#x430;.&#x440;&#x444;
     </div>
   </div>
 
   <div class="title-row">
-    <h1>НАКЛАДНАЯ НА ОТПРАВЛЕНИЕ</h1>
+    <h1>&#x41d;&#x410;&#x41a;&#x41b;&#x410;&#x414;&#x41d;&#x410;&#x42f; &#x41d;&#x410; &#x41e;&#x422;&#x41f;&#x420;&#x410;&#x412;&#x41b;&#x415;&#x41d;&#x418;&#x415;</h1>
     <div class="track-box">
-      <div class="lbl">Трек-номер</div>
+      <div class="lbl">&#x422;&#x440;&#x435;&#x43a;-&#x43d;&#x43e;&#x43c;&#x435;&#x440;</div>
       <div class="code"><?= e($trackLabel) ?></div>
       <svg class="barcode" data-code="<?= e($trackLabel) ?>"></svg>
     </div>
   </div>
 
   <div class="meta-row">
-    <div><div class="lbl">Дата приёма</div><?= crm_date($order['created_at'], 'd.m.Y') ?></div>
-    <div><div class="lbl">Пункт приёма</div>&nbsp;</div>
-    <div><div class="lbl">Принял (сотрудник)</div><?= e($user['name']) ?></div>
+    <div><div class="lbl">&#x414;&#x430;&#x442;&#x430; &#x43f;&#x440;&#x438;&#x451;&#x43c;&#x430;</div><?= crm_date($order['created_at'], 'd.m.Y') ?></div>
+    <div><div class="lbl">&#x41f;&#x443;&#x43d;&#x43a;&#x442; &#x43f;&#x440;&#x438;&#x451;&#x43c;&#x430;</div>&nbsp;</div>
+    <div><div class="lbl">&#x41f;&#x440;&#x438;&#x43d;&#x44f;&#x43b; (&#x441;&#x43e;&#x442;&#x440;&#x443;&#x434;&#x43d;&#x438;&#x43a;)</div><?= e($employee['name'] ?? '') ?></div>
   </div>
 
   <div class="two-col">
     <div class="col">
-      <h4>Отправитель</h4>
-      <div class="field"><div class="lbl">ФИО</div><div class="val"><?= e($order['client_name']) ?></div></div>
-      <div class="field"><div class="lbl">Телефон</div><div class="val"><?= e($order['client_phone']) ?></div></div>
-      <div class="field"><div class="lbl">Город отправления</div><div class="val"><?= e($order['from_city']) ?><?= $order['from_address'] ? ', ' . e($order['from_address']) : '' ?></div></div>
+      <h4>&#x41e;&#x442;&#x43f;&#x440;&#x430;&#x432;&#x438;&#x442;&#x435;&#x43b;&#x44c;</h4>
+      <div class="field"><div class="lbl">&#x424;&#x418;&#x41e;</div><div class="val"><?= e($order['client_name']) ?></div></div>
+      <div class="field"><div class="lbl">&#x422;&#x435;&#x43b;&#x435;&#x444;&#x43e;&#x43d;</div><div class="val"><?= e($order['client_phone']) ?></div></div>
+      <div class="field"><div class="lbl">&#x413;&#x43e;&#x440;&#x43e;&#x434; &#x43e;&#x442;&#x43f;&#x440;&#x430;&#x432;&#x43b;&#x435;&#x43d;&#x438;&#x44f;</div><div class="val"><?= e($order['from_city']) ?><?= $order['from_address'] ? ', ' . e($order['from_address']) : '' ?></div></div>
     </div>
     <div class="col">
-      <h4>Получатель</h4>
-      <div class="field"><div class="lbl">ФИО</div><div class="val">&nbsp;</div></div>
-      <div class="field"><div class="lbl">Телефон</div><div class="val">&nbsp;</div></div>
-      <div class="field"><div class="lbl">Город / адрес доставки</div><div class="val"><?= e($order['to_city']) ?><?= $order['to_address'] ? ', ' . e($order['to_address']) : '' ?></div></div>
+      <h4>&#x41f;&#x43e;&#x43b;&#x443;&#x447;&#x430;&#x442;&#x435;&#x43b;&#x44c;</h4>
+      <div class="field"><div class="lbl">&#x424;&#x418;&#x41e;</div><div class="val">&nbsp;</div></div>
+      <div class="field"><div class="lbl">&#x422;&#x435;&#x43b;&#x435;&#x444;&#x43e;&#x43d;</div><div class="val">&nbsp;</div></div>
+      <div class="field"><div class="lbl">&#x413;&#x43e;&#x440;&#x43e;&#x434; / &#x430;&#x434;&#x440;&#x435;&#x441; &#x434;&#x43e;&#x441;&#x442;&#x430;&#x432;&#x43a;&#x438;</div><div class="val"><?= e($order['to_city']) ?><?= $order['to_address'] ? ', ' . e($order['to_address']) : '' ?></div></div>
     </div>
   </div>
 
   <div class="cargo-types">
-    <span><?= wb_check($service === '') ?> Физическое лицо</span>
-    <span><?= wb_check($service === 'Посылка') ?> Посылка</span>
-    <span><?= wb_check($service === 'Продукты') ?> Продукты питания</span>
-    <span><?= wb_check($service === 'B2B') ?> Для юр. лиц (B2B)</span>
+    <span><?= wb_check($service === '') ?> &#x424;&#x438;&#x437;&#x438;&#x447;&#x435;&#x441;&#x43a;&#x43e;&#x435; &#x43b;&#x438;&#x446;&#x43e;</span>
+    <span><?= wb_check($service === "\u{41f}\u{43e}\u{441}\u{44b}\u{43b}\u{43a}\u{430}") ?> &#x41f;&#x43e;&#x441;&#x44b;&#x43b;&#x43a;&#x430;</span>
+    <span><?= wb_check($service === "\u{41f}\u{440}\u{43e}\u{434}\u{443}\u{43a}\u{442}\u{44b}") ?> &#x41f;&#x440;&#x43e;&#x434;&#x443;&#x43a;&#x442;&#x44b; &#x43f;&#x438;&#x442;&#x430;&#x43d;&#x438;&#x44f;</span>
+    <span><?= wb_check($service === 'B2B') ?> &#x414;&#x43b;&#x44f; &#x44e;&#x440;. &#x43b;&#x438;&#x446; (B2B)</span>
   </div>
 
   <div class="cargo-grid">
-    <div class="box"><div class="lbl">Вес, кг</div><div class="val"><?= $order['weight_kg'] !== null ? e(rtrim(rtrim(number_format((float)$order['weight_kg'], 2, '.', ''), '0'), '.')) : '—' ?></div></div>
-    <div class="box"><div class="lbl">Объявленная ценность, ₽</div><div class="val"><?= $order['declared_value'] !== null ? crm_money((float) $order['declared_value']) : '—' ?></div></div>
-    <div class="box"><div class="lbl">Описание содержимого</div><div class="val" style="font-weight:400;font-size:.88rem;"><?= e($order['cargo_description']) ?: '&nbsp;' ?></div></div>
+    <div class="box"><div class="lbl">&#x412;&#x435;&#x441;, &#x43a;&#x433;</div><div class="val"><?= $order['weight_kg'] !== null ? e(rtrim(rtrim(number_format((float)$order['weight_kg'], 2, '.', ''), '0'), '.')) : "\u{2014}" ?></div></div>
+    <div class="box"><div class="lbl">&#x41e;&#x431;&#x44a;&#x44f;&#x432;&#x43b;&#x435;&#x43d;&#x43d;&#x430;&#x44f; &#x446;&#x435;&#x43d;&#x43d;&#x43e;&#x441;&#x442;&#x44c;, &#x20bd;</div><div class="val"><?= $order['declared_value'] !== null ? crm_money((float) $order['declared_value']) : "\u{2014}" ?></div></div>
+    <div class="box"><div class="lbl">&#x41e;&#x43f;&#x438;&#x441;&#x430;&#x43d;&#x438;&#x435; &#x441;&#x43e;&#x434;&#x435;&#x440;&#x436;&#x438;&#x43c;&#x43e;&#x433;&#x43e;</div><div class="val" style="font-weight:400;font-size:.88rem;"><?= e($order['cargo_description']) ?: '&nbsp;' ?></div></div>
   </div>
 
   <div class="addons">
-    ☐ Термоупаковка / термобокс &nbsp;&nbsp; ☐ Хрупкий груз &nbsp;&nbsp; ☐ Опись документов / вложений<br>
-    ☐ SMS-уведомления о статусе &nbsp;&nbsp; ☐ Страхование груза
+    &#x2610; &#x422;&#x435;&#x440;&#x43c;&#x43e;&#x443;&#x43f;&#x430;&#x43a;&#x43e;&#x432;&#x43a;&#x430; / &#x442;&#x435;&#x440;&#x43c;&#x43e;&#x431;&#x43e;&#x43a;&#x441; &nbsp;&nbsp; &#x2610; &#x425;&#x440;&#x443;&#x43f;&#x43a;&#x438;&#x439; &#x433;&#x440;&#x443;&#x437; &nbsp;&nbsp; &#x2610; &#x41e;&#x43f;&#x438;&#x441;&#x44c; &#x434;&#x43e;&#x43a;&#x443;&#x43c;&#x435;&#x43d;&#x442;&#x43e;&#x432; / &#x432;&#x43b;&#x43e;&#x436;&#x435;&#x43d;&#x438;&#x439;<br>
+    &#x2610; SMS-&#x443;&#x432;&#x435;&#x434;&#x43e;&#x43c;&#x43b;&#x435;&#x43d;&#x438;&#x44f; &#x43e; &#x441;&#x442;&#x430;&#x442;&#x443;&#x441;&#x435; &nbsp;&nbsp; &#x2610; &#x421;&#x442;&#x440;&#x430;&#x445;&#x43e;&#x432;&#x430;&#x43d;&#x438;&#x435; &#x433;&#x440;&#x443;&#x437;&#x430;
   </div>
 
   <table class="cost-table">
-    <tr><td>Стоимость доставки</td><td><?= $order['price'] !== null ? crm_money((float) $order['price']) : '______________ ₽' ?></td></tr>
-    <tr><td>Дополнительные услуги</td><td>______________ ₽</td></tr>
-    <tr class="total"><td>Итого к оплате</td><td><?= $order['price'] !== null ? crm_money((float) $order['price']) : '______________ ₽' ?></td></tr>
+    <tr><td>&#x421;&#x442;&#x43e;&#x438;&#x43c;&#x43e;&#x441;&#x442;&#x44c; &#x434;&#x43e;&#x441;&#x442;&#x430;&#x432;&#x43a;&#x438;</td><td><?= $order['price'] !== null ? crm_money((float) $order['price']) : "______________ \u{20bd}" ?></td></tr>
+    <tr><td>&#x414;&#x43e;&#x43f;&#x43e;&#x43b;&#x43d;&#x438;&#x442;&#x435;&#x43b;&#x44c;&#x43d;&#x44b;&#x435; &#x443;&#x441;&#x43b;&#x443;&#x433;&#x438;</td><td>______________ &#x20bd;</td></tr>
+    <tr class="total"><td>&#x418;&#x442;&#x43e;&#x433;&#x43e; &#x43a; &#x43e;&#x43f;&#x43b;&#x430;&#x442;&#x435;</td><td><?= $order['price'] !== null ? crm_money((float) $order['price']) : "______________ \u{20bd}" ?></td></tr>
   </table>
 
   <div class="pay-row">
-    <?= wb_check($order['payment_method'] === 'cash') ?> Наличный расчёт &nbsp;&nbsp;
-    <?= wb_check($order['payment_method'] === 'terminal') ?> Оплата через терминал &nbsp;&nbsp;
-    <?= wb_check($order['payment_method'] === 'invoice') ?> Оплата по счёту &nbsp;&nbsp;
-    <?= wb_check($order['payment_method'] === 'online') ?> Онлайн на сайте &nbsp;&nbsp;
-    <?= wb_check($order['payment_method'] === 'installment') ?> Рассрочка<br>
-    <?= wb_check($order['payment_status'] === 'postpaid') ?> Постоплата (после получения груза)
+    <?= wb_check($order['payment_method'] === 'cash') ?> &#x41d;&#x430;&#x43b;&#x438;&#x447;&#x43d;&#x44b;&#x439; &#x440;&#x430;&#x441;&#x447;&#x451;&#x442; &nbsp;&nbsp;
+    <?= wb_check($order['payment_method'] === 'terminal') ?> &#x41e;&#x43f;&#x43b;&#x430;&#x442;&#x430; &#x447;&#x435;&#x440;&#x435;&#x437; &#x442;&#x435;&#x440;&#x43c;&#x438;&#x43d;&#x430;&#x43b; &nbsp;&nbsp;
+    <?= wb_check($order['payment_method'] === 'invoice') ?> &#x41e;&#x43f;&#x43b;&#x430;&#x442;&#x430; &#x43f;&#x43e; &#x441;&#x447;&#x451;&#x442;&#x443; &nbsp;&nbsp;
+    <?= wb_check($order['payment_method'] === 'online') ?> &#x41e;&#x43d;&#x43b;&#x430;&#x439;&#x43d; &#x43d;&#x430; &#x441;&#x430;&#x439;&#x442;&#x435; &nbsp;&nbsp;
+    <?= wb_check($order['payment_method'] === 'installment') ?> &#x420;&#x430;&#x441;&#x441;&#x440;&#x43e;&#x447;&#x43a;&#x430;<br>
+    <?= wb_check($order['payment_status'] === 'postpaid') ?> &#x41f;&#x43e;&#x441;&#x442;&#x43e;&#x43f;&#x43b;&#x430;&#x442;&#x430; (&#x43f;&#x43e;&#x441;&#x43b;&#x435; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x44f; &#x433;&#x440;&#x443;&#x437;&#x430;)
   </div>
 
   <div class="sign-row">
-    <div>Подпись отправителя — груз и условия доставки подтверждаю</div>
-    <div>Подпись сотрудника пункта приёма / печать</div>
+    <div>&#x41f;&#x43e;&#x434;&#x43f;&#x438;&#x441;&#x44c; &#x43e;&#x442;&#x43f;&#x440;&#x430;&#x432;&#x438;&#x442;&#x435;&#x43b;&#x44f; &#x2014; &#x433;&#x440;&#x443;&#x437; &#x438; &#x443;&#x441;&#x43b;&#x43e;&#x432;&#x438;&#x44f; &#x434;&#x43e;&#x441;&#x442;&#x430;&#x432;&#x43a;&#x438; &#x43f;&#x43e;&#x434;&#x442;&#x432;&#x435;&#x440;&#x436;&#x434;&#x430;&#x44e;</div>
+    <div>&#x41f;&#x43e;&#x434;&#x43f;&#x438;&#x441;&#x44c; &#x441;&#x43e;&#x442;&#x440;&#x443;&#x434;&#x43d;&#x438;&#x43a;&#x430; &#x43f;&#x443;&#x43d;&#x43a;&#x442;&#x430; &#x43f;&#x440;&#x438;&#x451;&#x43c;&#x430; / &#x43f;&#x435;&#x447;&#x430;&#x442;&#x44c;</div>
   </div>
 </div>
 
-<div class="cut">✂ линия отрыва — квитанция клиента ниже</div>
+<div class="cut">&#x2702; &#x43b;&#x438;&#x43d;&#x438;&#x44f; &#x43e;&#x442;&#x440;&#x44b;&#x432;&#x430; &#x2014; &#x43a;&#x432;&#x438;&#x442;&#x430;&#x43d;&#x446;&#x438;&#x44f; &#x43a;&#x43b;&#x438;&#x435;&#x43d;&#x442;&#x430; &#x43d;&#x438;&#x436;&#x435;</div>
 
 <div class="sheet receipt">
   <div class="title-row">
-    <h1 style="font-size:.95rem;">КВИТАНЦИЯ О ПРИЁМЕ ГРУЗА</h1>
+    <h1 style="font-size:.95rem;">&#x41a;&#x412;&#x418;&#x422;&#x410;&#x41d;&#x426;&#x418;&#x42f; &#x41e; &#x41f;&#x420;&#x418;&#x401;&#x41c;&#x415; &#x413;&#x420;&#x423;&#x417;&#x410;</h1>
     <div class="track-box">
-      <div class="lbl">Трек-номер</div>
+      <div class="lbl">&#x422;&#x440;&#x435;&#x43a;-&#x43d;&#x43e;&#x43c;&#x435;&#x440;</div>
       <div class="code"><?= e($trackLabel) ?></div>
       <svg class="barcode" data-code="<?= e($trackLabel) ?>"></svg>
     </div>
   </div>
   <div class="grid">
-    <div><div class="lbl">Дата приёма</div><div class="val"><?= crm_date($order['created_at'], 'd.m.Y') ?></div></div>
-    <div><div class="lbl">Маршрут</div><div class="val"><?= e($order['from_city']) ?> → <?= e($order['to_city']) ?></div></div>
-    <div><div class="lbl">Отправитель</div><div class="val"><?= e($order['client_name']) ?></div></div>
-    <div><div class="lbl">Вес, кг</div><div class="val"><?= $order['weight_kg'] !== null ? e($order['weight_kg']) : '—' ?></div></div>
-    <div><div class="lbl">Телефон</div><div class="val"><?= e($order['client_phone']) ?></div></div>
-    <div><div class="lbl">Итого к оплате</div><div class="val"><?= $order['price'] !== null ? crm_money((float) $order['price']) : '—' ?></div></div>
+    <div><div class="lbl">&#x414;&#x430;&#x442;&#x430; &#x43f;&#x440;&#x438;&#x451;&#x43c;&#x430;</div><div class="val"><?= crm_date($order['created_at'], 'd.m.Y') ?></div></div>
+    <div><div class="lbl">&#x41c;&#x430;&#x440;&#x448;&#x440;&#x443;&#x442;</div><div class="val"><?= e($order['from_city']) ?> &#x2192; <?= e($order['to_city']) ?></div></div>
+    <div><div class="lbl">&#x41e;&#x442;&#x43f;&#x440;&#x430;&#x432;&#x438;&#x442;&#x435;&#x43b;&#x44c;</div><div class="val"><?= e($order['client_name']) ?></div></div>
+    <div><div class="lbl">&#x412;&#x435;&#x441;, &#x43a;&#x433;</div><div class="val"><?= $order['weight_kg'] !== null ? e($order['weight_kg']) : "\u{2014}" ?></div></div>
+    <div><div class="lbl">&#x422;&#x435;&#x43b;&#x435;&#x444;&#x43e;&#x43d;</div><div class="val"><?= e($order['client_phone']) ?></div></div>
+    <div><div class="lbl">&#x418;&#x442;&#x43e;&#x433;&#x43e; &#x43a; &#x43e;&#x43f;&#x43b;&#x430;&#x442;&#x435;</div><div class="val"><?= $order['price'] !== null ? crm_money((float) $order['price']) : "\u{2014}" ?></div></div>
   </div>
   <div class="note">
-    Сохраните эту квитанцию до получения груза. Отследить статус отправления — на сайте моя-посылочка.рф в разделе «Отследить», указав трек-номер, либо в мобильном приложении «Посылочка». Вопросы по доставке — по телефону +7 (812) 711-18-19.
+    &#x421;&#x43e;&#x445;&#x440;&#x430;&#x43d;&#x438;&#x442;&#x435; &#x44d;&#x442;&#x443; &#x43a;&#x432;&#x438;&#x442;&#x430;&#x43d;&#x446;&#x438;&#x44e; &#x434;&#x43e; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x44f; &#x433;&#x440;&#x443;&#x437;&#x430;. &#x41e;&#x442;&#x441;&#x43b;&#x435;&#x434;&#x438;&#x442;&#x44c; &#x441;&#x442;&#x430;&#x442;&#x443;&#x441; &#x43e;&#x442;&#x43f;&#x440;&#x430;&#x432;&#x43b;&#x435;&#x43d;&#x438;&#x44f; &#x2014; &#x43d;&#x430; &#x441;&#x430;&#x439;&#x442;&#x435; &#x43c;&#x43e;&#x44f;-&#x43f;&#x43e;&#x441;&#x44b;&#x43b;&#x43e;&#x447;&#x43a;&#x430;.&#x440;&#x444; &#x432; &#x440;&#x430;&#x437;&#x434;&#x435;&#x43b;&#x435; &#xab;&#x41e;&#x442;&#x441;&#x43b;&#x435;&#x434;&#x438;&#x442;&#x44c;&#xbb;, &#x443;&#x43a;&#x430;&#x437;&#x430;&#x432; &#x442;&#x440;&#x435;&#x43a;-&#x43d;&#x43e;&#x43c;&#x435;&#x440;, &#x43b;&#x438;&#x431;&#x43e; &#x432; &#x43c;&#x43e;&#x431;&#x438;&#x43b;&#x44c;&#x43d;&#x43e;&#x43c; &#x43f;&#x440;&#x438;&#x43b;&#x43e;&#x436;&#x435;&#x43d;&#x438;&#x438; &#xab;&#x41f;&#x43e;&#x441;&#x44b;&#x43b;&#x43e;&#x447;&#x43a;&#x430;&#xbb;. &#x412;&#x43e;&#x43f;&#x440;&#x43e;&#x441;&#x44b; &#x43f;&#x43e; &#x434;&#x43e;&#x441;&#x442;&#x430;&#x432;&#x43a;&#x435; &#x2014; &#x43f;&#x43e; &#x442;&#x435;&#x43b;&#x435;&#x444;&#x43e;&#x43d;&#x443; +7 (812) 711-18-19.
   </div>
 </div>
 
-<div class="footer-note">ПОСЫЛОЧКА · ИП Казаченко Наталия Николаевна · моя-посылочка.рф · Документ является подтверждением приёма груза к перевозке</div>
+<div class="footer-note">&#x41f;&#x41e;&#x421;&#x42b;&#x41b;&#x41e;&#x427;&#x41a;&#x410; &#xb7; &#x418;&#x41f; &#x41a;&#x430;&#x437;&#x430;&#x447;&#x435;&#x43d;&#x43a;&#x43e; &#x41d;&#x430;&#x442;&#x430;&#x43b;&#x438;&#x44f; &#x41d;&#x438;&#x43a;&#x43e;&#x43b;&#x430;&#x435;&#x432;&#x43d;&#x430; &#xb7; &#x43c;&#x43e;&#x44f;-&#x43f;&#x43e;&#x441;&#x44b;&#x43b;&#x43e;&#x447;&#x43a;&#x430;.&#x440;&#x444; &#xb7; &#x414;&#x43e;&#x43a;&#x443;&#x43c;&#x435;&#x43d;&#x442; &#x44f;&#x432;&#x43b;&#x44f;&#x435;&#x442;&#x441;&#x44f; &#x43f;&#x43e;&#x434;&#x442;&#x432;&#x435;&#x440;&#x436;&#x434;&#x435;&#x43d;&#x438;&#x435;&#x43c; &#x43f;&#x440;&#x438;&#x451;&#x43c;&#x430; &#x433;&#x440;&#x443;&#x437;&#x430; &#x43a; &#x43f;&#x435;&#x440;&#x435;&#x432;&#x43e;&#x437;&#x43a;&#x435;</div>
 
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
 <script>
@@ -215,7 +229,7 @@ document.querySelectorAll('svg.barcode').forEach(function (el) {
       displayValue: false,
       margin: 0
     });
-  } catch (e) { /* если код содержит символы, не подходящие CODE128, просто не рисуем штрихкод */ }
+  } catch (e) { /* &#x435;&#x441;&#x43b;&#x438; &#x43a;&#x43e;&#x434; &#x441;&#x43e;&#x434;&#x435;&#x440;&#x436;&#x438;&#x442; &#x441;&#x438;&#x43c;&#x432;&#x43e;&#x43b;&#x44b;, &#x43d;&#x435; &#x43f;&#x43e;&#x434;&#x445;&#x43e;&#x434;&#x44f;&#x449;&#x438;&#x435; CODE128, &#x43f;&#x440;&#x43e;&#x441;&#x442;&#x43e; &#x43d;&#x435; &#x440;&#x438;&#x441;&#x443;&#x435;&#x43c; &#x448;&#x442;&#x440;&#x438;&#x445;&#x43a;&#x43e;&#x434; */ }
 });
 </script>
 
