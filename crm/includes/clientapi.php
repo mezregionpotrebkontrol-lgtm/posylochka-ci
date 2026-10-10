@@ -484,9 +484,19 @@ function capi_create_order_row(
 function crm_notify_owner(string $text): void
 {
     $cfg = crm_config();
+
     $chatId = $cfg['green_api']['ownerChatId'] ?? '';
-    if ($chatId === '' || stripos($chatId, "\u{417}\u{410}\u{41c}\u{415}\u{41d}\u{418}\u{422}\u{415}") !== false) {
-        return;
+    if ($chatId !== '' && stripos($chatId, "\u{417}\u{410}\u{41c}\u{415}\u{41d}\u{418}\u{422}\u{415}") === false) {
+        crm_send_max_message($chatId, $text);
     }
-    crm_send_max_message($chatId, $text);
+
+    // &#x414;&#x443;&#x431;&#x43b;&#x438;&#x440;&#x443;&#x435;&#x43c; &#x443;&#x432;&#x435;&#x434;&#x43e;&#x43c;&#x43b;&#x435;&#x43d;&#x438;&#x435; &#x43d;&#x430; &#x43f;&#x43e;&#x447;&#x442;&#x443; &#x432;&#x43b;&#x430;&#x434;&#x435;&#x43b;&#x44c;&#x446;&#x430;, &#x435;&#x441;&#x43b;&#x438; &#x430;&#x434;&#x440;&#x435;&#x441; &#x43d;&#x430;&#x441;&#x442;&#x440;&#x43e;&#x435;&#x43d; &#x432;
+    // config.php (mail.owner_email) &#x2014; &#x43d;&#x435;&#x437;&#x430;&#x432;&#x438;&#x441;&#x438;&#x43c;&#x44b;&#x439; &#x43a;&#x430;&#x43d;&#x430;&#x43b; &#x43d;&#x430; &#x441;&#x43b;&#x443;&#x447;&#x430;&#x439;, &#x435;&#x441;&#x43b;&#x438;
+    // MAX/WhatsApp &#x43d;&#x435;&#x434;&#x43e;&#x441;&#x442;&#x443;&#x43f;&#x435;&#x43d; &#x438;&#x43b;&#x438; &#x438;&#x43d;&#x441;&#x442;&#x430;&#x43d;&#x441; &#x43e;&#x442;&#x432;&#x430;&#x43b;&#x438;&#x43b;&#x441;&#x44f;.
+    $ownerEmail = $cfg['mail']['owner_email'] ?? '';
+    if ($ownerEmail !== '' && stripos($ownerEmail, "\u{417}\u{410}\u{41c}\u{415}\u{41d}\u{418}\u{422}\u{415}") === false) {
+        $firstLine = strtok($text, "\n");
+        $subject = $firstLine !== false && $firstLine !== '' ? $firstLine : "\u{41d}\u{43e}\u{432}\u{43e}\u{435} \u{443}\u{432}\u{435}\u{434}\u{43e}\u{43c}\u{43b}\u{435}\u{43d}\u{438}\u{435} \u{441} \u{441}\u{430}\u{439}\u{442}\u{430}";
+        crm_send_email($ownerEmail, $subject, $text);
+    }
 }
