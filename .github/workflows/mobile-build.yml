@@ -45,7 +45,7 @@ jobs:
           grep -qE 'versionCode +${{ vars.ANDROID_VERSION_CODE || 8 }}\b' build.gradle || { echo "::error::versionCode не обновился — проверьте шаблон build.gradle"; exit 1; }
 
       - name: Generate icons & splash screens
-        run: npx @capacitor/assets generate --android --iconBackgroundColor '#0A2472' --iconBackgroundColorDark '#0A2472' --splashBackgroundColor '#0A2472' --splashBackgroundColorDark '#0A2472'
+        run: npx @capacitor/assets generate --android --iconBackgroundColor '#FFFFFF' --iconBackgroundColorDark '#FFFFFF' --splashBackgroundColor '#0A2472' --splashBackgroundColorDark '#0A2472'
 
       - name: Sync web assets into native project
         run: npx cap sync android
@@ -113,7 +113,7 @@ jobs:
           grep -qE 'versionCode +${{ vars.ANDROID_VERSION_CODE || 8 }}\b' build.gradle || { echo "::error::versionCode не обновился — проверьте шаблон build.gradle"; exit 1; }
 
       - name: Generate icons & splash screens
-        run: npx @capacitor/assets generate --android --iconBackgroundColor '#0A2472' --iconBackgroundColorDark '#0A2472' --splashBackgroundColor '#0A2472' --splashBackgroundColorDark '#0A2472'
+        run: npx @capacitor/assets generate --android --iconBackgroundColor '#FFFFFF' --iconBackgroundColorDark '#FFFFFF' --splashBackgroundColor '#0A2472' --splashBackgroundColorDark '#0A2472'
 
       - name: Sync web assets into native project
         run: npx cap sync android
@@ -183,7 +183,7 @@ jobs:
         run: npx cap add ios
 
       - name: Generate icons & splash screens
-        run: npx @capacitor/assets generate --ios --iconBackgroundColor '#0A2472' --splashBackgroundColor '#0A2472'
+        run: npx @capacitor/assets generate --ios --iconBackgroundColor '#FFFFFF' --splashBackgroundColor '#0A2472'
 
       - name: Sync web assets into native project
         run: npx cap sync ios
