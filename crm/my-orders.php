@@ -94,17 +94,25 @@ require __DIR__ . '/includes/layout_top.php';
     <div class="empty-state">&#x41f;&#x43e;&#x43a;&#x430; &#x43d;&#x435;&#x442; &#x43d;&#x430;&#x437;&#x43d;&#x430;&#x447;&#x435;&#x43d;&#x43d;&#x44b;&#x445; &#x437;&#x430;&#x44f;&#x432;&#x43e;&#x43a;.</div>
   <?php else: ?>
     <table>
-      <thead><tr><th>&#x2116;</th><th>&#x41a;&#x43b;&#x438;&#x435;&#x43d;&#x442;</th><th>&#x41c;&#x430;&#x440;&#x448;&#x440;&#x443;&#x442;</th><th>&#x410;&#x434;&#x440;&#x435;&#x441; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x44f;</th><th>&#x414;&#x430;&#x442;&#x430;</th><th>&#x421;&#x442;&#x430;&#x442;&#x443;&#x441;</th><th>&#x414;&#x435;&#x439;&#x441;&#x442;&#x432;&#x438;&#x435;</th></tr></thead>
+      <thead><tr><th>&#x2116;</th><th>&#x41a;&#x43b;&#x438;&#x435;&#x43d;&#x442;</th><th>&#x41c;&#x430;&#x440;&#x448;&#x440;&#x443;&#x442;</th><th>&#x410;&#x434;&#x440;&#x435;&#x441; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x44f;</th><th>&#x421;&#x442;&#x43e;&#x438;&#x43c;&#x43e;&#x441;&#x442;&#x44c;</th><th>&#x414;&#x430;&#x442;&#x430;</th><th>&#x421;&#x442;&#x430;&#x442;&#x443;&#x441;</th><th>&#x414;&#x435;&#x439;&#x441;&#x442;&#x432;&#x438;&#x435;</th></tr></thead>
       <tbody>
         <?php foreach ($activeOrders as $o): ?>
         <tr>
           <td>#<?= (int)$o['id'] ?></td>
-          <td><?= e($o['client_name']) ?><br><span class="text-muted"><?= e($o['client_phone']) ?></span></td>
+          <td><?= e($o['client_name']) ?><br><span class="text-muted"><?= e($o['client_phone']) ?></span>
+            <?php if (!empty($o['recipient_name']) || !empty($o['recipient_phone'])): ?>
+            <br><span class="text-muted">&#x41f;&#x43e;&#x43b;&#x443;&#x447;&#x430;&#x442;&#x435;&#x43b;&#x44c;: <?= e($o['recipient_name'] ?: "\u{2014}") ?><?= $o['recipient_phone'] ? ' ' . "\u{2014}" . ' ' . e($o['recipient_phone']) : '' ?></span>
+            <?php endif; ?>
+          </td>
           <td><?= e($o['from_city']) ?> &#x2192; <?= e($o['to_city']) ?></td>
           <td><?= e($o['to_address']) ?></td>
+          <td><?= $o['price'] !== null ? crm_money((float) $o['price']) : "\u{2014}" ?></td>
           <td><?= $o['planned_date'] ? crm_date($o['planned_date'], 'd.m.Y') : "\u{2014}" ?></td>
           <td><span class="badge <?= crm_order_status_class($o['status']) ?>"><?= e(crm_order_status_label($o['status'])) ?></span></td>
           <td>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+              <a class="btn small secondary" href="/crm/waybill.php?id=<?= (int)$o['id'] ?>" target="_blank">&#x41d;&#x430;&#x43a;&#x43b;&#x430;&#x434;&#x43d;&#x430;&#x44f;</a>
+            </div>
             <form method="post" class="inline" enctype="multipart/form-data" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
               <?= crm_csrf_field() ?>
               <input type="hidden" name="action" value="change_status">
@@ -140,13 +148,15 @@ require __DIR__ . '/includes/layout_top.php';
     <div class="empty-state">&#x41f;&#x43e;&#x43a;&#x430; &#x43d;&#x435;&#x442; &#x437;&#x430;&#x432;&#x435;&#x440;&#x448;&#x451;&#x43d;&#x43d;&#x44b;&#x445; &#x437;&#x430;&#x44f;&#x432;&#x43e;&#x43a;.</div>
   <?php else: ?>
     <table>
-      <thead><tr><th>&#x2116;</th><th>&#x41a;&#x43b;&#x438;&#x435;&#x43d;&#x442;</th><th>&#x421;&#x442;&#x430;&#x442;&#x443;&#x441;</th></tr></thead>
+      <thead><tr><th>&#x2116;</th><th>&#x41a;&#x43b;&#x438;&#x435;&#x43d;&#x442;</th><th>&#x421;&#x442;&#x43e;&#x438;&#x43c;&#x43e;&#x441;&#x442;&#x44c;</th><th>&#x421;&#x442;&#x430;&#x442;&#x443;&#x441;</th><th>&#x414;&#x435;&#x439;&#x441;&#x442;&#x432;&#x438;&#x435;</th></tr></thead>
       <tbody>
         <?php foreach ($doneOrders as $o): ?>
         <tr>
           <td>#<?= (int)$o['id'] ?></td>
           <td><?= e($o['client_name']) ?></td>
+          <td><?= $o['price'] !== null ? crm_money((float) $o['price']) : "\u{2014}" ?></td>
           <td><span class="badge <?= crm_order_status_class($o['status']) ?>"><?= e(crm_order_status_label($o['status'])) ?></span></td>
+          <td><a class="btn small secondary" href="/crm/waybill.php?id=<?= (int)$o['id'] ?>" target="_blank">&#x41d;&#x430;&#x43a;&#x43b;&#x430;&#x434;&#x43d;&#x430;&#x44f;</a></td>
         </tr>
         <?php endforeach; ?>
       </tbody>

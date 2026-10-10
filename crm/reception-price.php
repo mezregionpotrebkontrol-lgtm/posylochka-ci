@@ -8,7 +8,7 @@
  */
 require_once __DIR__ . '/includes/bootstrap.php';
 require_once __DIR__ . '/includes/pricing-formula.php';
-crm_require_role(['admin', 'operator']);
+crm_require_role(['admin', 'operator', 'courier']);
 
 header('Content-Type: application/json; charset=utf-8');
 
