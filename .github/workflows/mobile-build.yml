@@ -8,10 +8,9 @@ name: Mobile App Build (Android / iOS)
   workflow_dispatch: {}
 
 jobs:
-  android-twa:
-    name: Android (TWA — real Chrome rendering, for RuStore / Google Play)
+  android-debug:
+    name: Android (debug APK — для быстрой проверки на телефоне)
     runs-on: ubuntu-latest
-    if: ${{ vars.HAS_ANDROID_SIGNING == 'true' }}
     permissions:
       contents: write
     defaults:
@@ -24,90 +23,145 @@ jobs:
         with:
           node-version: 20
 
+      - name: Install JS deps
+        run: npm install
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Set app version (versionCode/versionName)
+        working-directory: mobile-app/android/app
+        run: |
+          # Capacitor's generated build.gradle always has a line "versionCode <N>" and
+          # "versionName \"<X.Y.Z>\"" inside defaultConfig, but the exact default number can
+          # change between Capacitor releases — match by pattern, not by an exact literal,
+          # so this step never silently no-ops if the generated default changes.
+          sed -i -E 's/versionCode [0-9]+/versionCode ${{ vars.ANDROID_VERSION_CODE || 8 }}/' build.gradle
+          sed -i -E 's/versionName "[^"]*"/versionName "${{ vars.ANDROID_VERSION_NAME || '\''2.1.0'\'' }}"/' build.gradle
+          echo "--- итоговая версия в build.gradle ---"
+          grep -E 'versionCode|versionName' build.gradle
+          # Жёсткая проверка: если версия не совпала с ожидаемой — останавливаем сборку,
+          # чтобы не отправить в RuStore APK со старым versionCode (конфликт с версией 7).
+          grep -qE 'versionCode +${{ vars.ANDROID_VERSION_CODE || 8 }}\b' build.gradle || { echo "::error::versionCode не обновился — проверьте шаблон build.gradle"; exit 1; }
+
+      - name: Generate icons & splash screens
+        run: npx @capacitor/assets generate --android --iconBackgroundColor '#0A2472' --iconBackgroundColorDark '#0A2472' --splashBackgroundColor '#0A2472' --splashBackgroundColorDark '#0A2472'
+
+      - name: Sync web assets into native project
+        run: npx cap sync android
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build debug APK
+        working-directory: mobile-app/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Publish APK to a public GitHub Release (no login needed to download)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          apk=$(find android/app/build/outputs/apk/debug -name '*.apk' | head -1)
+          cp "$apk" posylochka-debug-latest.apk
+          gh release delete latest-build --yes --cleanup-tag || true
+          gh release create latest-build posylochka-debug-latest.apk \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Последняя тестовая сборка (debug, Capacitor)" \
+            --notes "Скачайте posylochka-debug-latest.apk и установите на Android-телефон — проверьте, что сайт внутри приложения выглядит так же, как в Chrome, перед отправкой в RuStore."
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: posylochka-android-debug
+          path: mobile-app/android/app/build/outputs/apk/debug/*.apk
+
+  android-release:
+    name: Android (signed release APK for RuStore / Google Play)
+    runs-on: ubuntu-latest
+    if: ${{ vars.HAS_ANDROID_SIGNING == 'true' }}
+    defaults:
+      run:
+        working-directory: mobile-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install JS deps
+        run: npm install
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Set app version (versionCode/versionName)
+        working-directory: mobile-app/android/app
+        run: |
+          # Capacitor's generated build.gradle always has a line "versionCode <N>" and
+          # "versionName \"<X.Y.Z>\"" inside defaultConfig, but the exact default number can
+          # change between Capacitor releases — match by pattern, not by an exact literal,
+          # so this step never silently no-ops if the generated default changes.
+          sed -i -E 's/versionCode [0-9]+/versionCode ${{ vars.ANDROID_VERSION_CODE || 8 }}/' build.gradle
+          sed -i -E 's/versionName "[^"]*"/versionName "${{ vars.ANDROID_VERSION_NAME || '\''2.1.0'\'' }}"/' build.gradle
+          echo "--- итоговая версия в build.gradle ---"
+          grep -E 'versionCode|versionName' build.gradle
+          # Жёсткая проверка: если версия не совпала с ожидаемой — останавливаем сборку,
+          # чтобы не отправить в RuStore APK со старым versionCode (конфликт с версией 7).
+          grep -qE 'versionCode +${{ vars.ANDROID_VERSION_CODE || 8 }}\b' build.gradle || { echo "::error::versionCode не обновился — проверьте шаблон build.gradle"; exit 1; }
+
+      - name: Generate icons & splash screens
+        run: npx @capacitor/assets generate --android --iconBackgroundColor '#0A2472' --iconBackgroundColorDark '#0A2472' --splashBackgroundColor '#0A2472' --splashBackgroundColorDark '#0A2472'
+
+      - name: Sync web assets into native project
+        run: npx cap sync android
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Decode signing keystore
-        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android.keystore
+        working-directory: mobile-app/android/app
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > release.keystore
 
-      - name: Install a fresh Android SDK (cmdline-tools) for Bubblewrap
-        shell: bash
+      - name: Add signing config to build.gradle
+        working-directory: mobile-app/android
         run: |
-          set -o pipefail
-          ( set -ex
-            SDK_ROOT="$HOME/android-sdk"
-            mkdir -p "$SDK_ROOT/cmdline-tools"
-            cd "$SDK_ROOT/cmdline-tools"
-            curl -sS -o cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
-            unzip -q cmdline-tools.zip
-            mv cmdline-tools latest
-            rm cmdline-tools.zip
-            yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK_ROOT" --licenses || true
-            "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK_ROOT" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
-            ln -s "$SDK_ROOT/cmdline-tools/latest" "$SDK_ROOT/tools"
-            echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
-            echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
-          ) 2>&1 | tee sdk-install.log
+          cat >> app/build.gradle << 'EOF'
 
-      - name: Point Bubblewrap at the JDK/Android SDK (skip interactive setup)
-        run: |
-          echo "JAVA_HOME=$JAVA_HOME"
-          echo "Using Android SDK at: $ANDROID_HOME"
-          ls "$ANDROID_HOME"
-          mkdir -p ~/.bubblewrap
-          cat > ~/.bubblewrap/config.json << EOF
-          {
-            "jdkPath": "${JAVA_HOME}",
-            "androidSdkPath": "${ANDROID_HOME}"
+          android {
+              signingConfigs {
+                  release {
+                      storeFile file("release.keystore")
+                      storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                      keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                      keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                  }
+              }
           }
           EOF
-          cat ~/.bubblewrap/config.json
 
-      - name: Build signed TWA APK with Bubblewrap
-        shell: bash
+      - name: Build signed release APK
+        working-directory: mobile-app/android
         env:
-          BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          npx @bubblewrap/cli update --skipVersionUpgrade 2>&1 | tee build.log
-          npx @bubblewrap/cli build --skipPwaValidation 2>&1 | tee -a build.log
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --no-daemon
 
-      - name: Publish logs to a GitHub Release (always, for debugging)
-        if: always()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          : > combined-logs.txt
-          for f in sdk-install.log build.log; do
-            if [ -f "$f" ]; then
-              echo "===== $f =====" >> combined-logs.txt
-              cat "$f" >> combined-logs.txt
-            fi
-          done
-          gh release delete build-logs --yes --cleanup-tag || true
-          gh release create build-logs combined-logs.txt \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "Логи последней сборки (для отладки)" \
-            --notes "Служебный файл для отладки сборки." || true
-
-      - name: Publish APK to a public GitHub Release (no login needed to download)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cp app-release-signed.apk posylochka-latest.apk
-          gh release delete latest-build --yes --cleanup-tag || true
-          gh release create latest-build posylochka-latest.apk \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "Последняя сборка приложения (TWA)" \
-            --notes "Скачайте posylochka-latest.apk и установите на Android-телефон. Открывает сайт в полноценном Chrome внутри приложения — без лишнего масштабирования."
-
-      - name: Upload signed APK
+      - name: Upload signed release APK
         uses: actions/upload-artifact@v4
         with:
-          name: posylochka-android-twa-signed
-          path: mobile-app/app-release-signed.apk
+          name: posylochka-android-release-signed
+          path: mobile-app/android/app/build/outputs/apk/release/*.apk
 
   ios:
     name: iOS (simulator build check)
