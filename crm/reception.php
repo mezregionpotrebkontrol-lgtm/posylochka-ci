@@ -14,6 +14,7 @@
  * &#x432;&#x44b;&#x434;&#x430;&#x43d;&#x43d;&#x44b;&#x435; &#x437;&#x434;&#x435;&#x441;&#x44c;, &#x43f;&#x43e;&#x43b;&#x43d;&#x43e;&#x441;&#x442;&#x44c;&#x44e; &#x432;&#x438;&#x434;&#x43d;&#x44b; &#x438; &#x440;&#x435;&#x434;&#x430;&#x43a;&#x442;&#x438;&#x440;&#x443;&#x435;&#x43c;&#x44b; &#x442;&#x430;&#x43c; &#x436;&#x435;.
  */
 require_once __DIR__ . '/includes/bootstrap.php';
+require_once __DIR__ . '/includes/email.php';
 require_once __DIR__ . '/includes/clientapi.php';
 require_once __DIR__ . '/includes/pricing-formula.php';
 $user = crm_require_role(['admin', 'operator']);
