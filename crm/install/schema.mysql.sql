@@ -73,12 +73,16 @@ CREATE TABLE IF NOT EXISTS orders (
     to_address VARCHAR(500) DEFAULT NULL,
     cargo_description VARCHAR(500) DEFAULT NULL,
     weight_kg DECIMAL(8,2) DEFAULT NULL,
+    places_count INT UNSIGNED NOT NULL DEFAULT 1,
     declared_value DECIMAL(12,2) DEFAULT NULL,
     price DECIMAL(12,2) DEFAULT NULL,
     payment_status ENUM('unpaid','postpaid','paid') NOT NULL DEFAULT 'unpaid',
     payment_method ENUM('online','cash','terminal','invoice','installment') DEFAULT NULL,
+    is_cod TINYINT(1) NOT NULL DEFAULT 0,
+    cod_amount DECIMAL(12,2) DEFAULT NULL,
     planned_date DATE DEFAULT NULL,
     comment TEXT DEFAULT NULL,
+    recipient_signature LONGTEXT DEFAULT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
@@ -103,6 +107,24 @@ CREATE TABLE IF NOT EXISTS order_status_history (
     changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
     FOREIGN KEY (changed_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==========================================================
+-- Грузоместа со штрихкодом (печать этикеток, сканирование на складе)
+-- ==========================================================
+CREATE TABLE IF NOT EXISTS order_packages (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    order_id INT UNSIGNED NOT NULL,
+    seq INT UNSIGNED NOT NULL,
+    barcode VARCHAR(40) NOT NULL UNIQUE,
+    status ENUM('created','packed','loaded','delivered') NOT NULL DEFAULT 'created',
+    scanned_at DATETIME DEFAULT NULL,
+    scanned_by INT UNSIGNED DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (scanned_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_order_packages_order (order_id),
+    INDEX idx_order_packages_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==========================================================

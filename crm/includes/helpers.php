@@ -73,6 +73,68 @@ function crm_shipment_run_status_class(string $status): string
     ][$status] ?? 'badge-grey';
 }
 
+/**
+ * &#x413;&#x440;&#x443;&#x437;&#x43e;&#x43c;&#x435;&#x441;&#x442;&#x43e; (order_packages): &#x441;&#x442;&#x430;&#x442;&#x443;&#x441; &#x43f;&#x440;&#x43e;&#x445;&#x43e;&#x436;&#x434;&#x435;&#x43d;&#x438;&#x44f; &#x43f;&#x43e; &#x441;&#x43a;&#x43b;&#x430;&#x434;&#x443;.
+ */
+function crm_package_status_label(string $status): string
+{
+    return [
+        'created'   => "\u{421}\u{43e}\u{437}\u{434}\u{430}\u{43d}\u{43e}",
+        'packed'    => "\u{423}\u{43f}\u{430}\u{43a}\u{43e}\u{432}\u{430}\u{43d}\u{43e}",
+        'loaded'    => "\u{41f}\u{43e}\u{433}\u{440}\u{443}\u{436}\u{435}\u{43d}\u{43e} \u{432} \u{440}\u{435}\u{439}\u{441}",
+        'delivered' => "\u{412}\u{440}\u{443}\u{447}\u{435}\u{43d}\u{43e}",
+    ][$status] ?? $status;
+}
+
+function crm_package_status_class(string $status): string
+{
+    return [
+        'created'   => 'badge-grey',
+        'packed'    => 'badge-blue',
+        'loaded'    => 'badge-orange',
+        'delivered' => 'badge-green',
+    ][$status] ?? 'badge-grey';
+}
+
+/**
+ * &#x428;&#x442;&#x440;&#x438;&#x445;&#x43a;&#x43e;&#x434; &#x43e;&#x434;&#x43d;&#x43e;&#x433;&#x43e; &#x433;&#x440;&#x443;&#x437;&#x43e;&#x43c;&#x435;&#x441;&#x442;&#x430;: PSL{orderId}-{seq &#x441; &#x432;&#x435;&#x434;&#x443;&#x449;&#x438;&#x43c; &#x43d;&#x443;&#x43b;&#x451;&#x43c;}, &#x43d;&#x430;&#x43f;&#x440;&#x438;&#x43c;&#x435;&#x440; PSL47-01.
+ * &#x423;&#x43d;&#x438;&#x43a;&#x430;&#x43b;&#x44c;&#x43d;&#x43e;&#x441;&#x442;&#x44c; &#x433;&#x430;&#x440;&#x430;&#x43d;&#x442;&#x438;&#x440;&#x443;&#x435;&#x442;&#x441;&#x44f; UNIQUE-&#x438;&#x43d;&#x434;&#x435;&#x43a;&#x441;&#x43e;&#x43c; &#x432; order_packages &#x2014; &#x43f;&#x440;&#x438; &#x43a;&#x43e;&#x43b;&#x43b;&#x438;&#x437;&#x438;&#x438;
+ * (&#x43a;&#x440;&#x430;&#x439;&#x43d;&#x435; &#x43c;&#x430;&#x43b;&#x43e;&#x432;&#x435;&#x440;&#x43e;&#x44f;&#x442;&#x43d;&#x43e;&#x439;) &#x432;&#x44b;&#x437;&#x44b;&#x432;&#x430;&#x44e;&#x449;&#x438;&#x439; &#x43a;&#x43e;&#x434; &#x434;&#x43e;&#x43b;&#x436;&#x435;&#x43d; &#x43f;&#x43e;&#x432;&#x442;&#x43e;&#x440;&#x438;&#x442;&#x44c; &#x43f;&#x43e;&#x43f;&#x44b;&#x442;&#x43a;&#x443;.
+ */
+function crm_generate_package_barcode(int $orderId, int $seq): string
+{
+    return 'PSL' . $orderId . '-' . str_pad((string) $seq, 2, '0', STR_PAD_LEFT);
+}
+
+/**
+ * &#x421;&#x43e;&#x437;&#x434;&#x430;&#x451;&#x442; &#x43d;&#x435;&#x434;&#x43e;&#x441;&#x442;&#x430;&#x44e;&#x449;&#x438;&#x435; &#x441;&#x442;&#x440;&#x43e;&#x43a;&#x438; order_packages &#x434;&#x43b;&#x44f; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x438;, &#x447;&#x442;&#x43e;&#x431;&#x44b; &#x438;&#x445; &#x447;&#x438;&#x441;&#x43b;&#x43e;
+ * &#x441;&#x43e;&#x43e;&#x442;&#x432;&#x435;&#x442;&#x441;&#x442;&#x432;&#x43e;&#x432;&#x430;&#x43b;&#x43e; orders.places_count. &#x411;&#x435;&#x437;&#x43e;&#x43f;&#x430;&#x441;&#x43d;&#x43e; &#x432;&#x44b;&#x437;&#x44b;&#x432;&#x430;&#x442;&#x44c; &#x43f;&#x43e;&#x432;&#x442;&#x43e;&#x440;&#x43d;&#x43e; &#x2014;
+ * &#x441;&#x443;&#x449;&#x435;&#x441;&#x442;&#x432;&#x443;&#x44e;&#x449;&#x438;&#x435; &#x43c;&#x435;&#x441;&#x442;&#x430; &#x43d;&#x435; &#x442;&#x440;&#x43e;&#x433;&#x430;&#x435;&#x442;, &#x442;&#x43e;&#x43b;&#x44c;&#x43a;&#x43e; &#x434;&#x43e;&#x431;&#x430;&#x432;&#x43b;&#x44f;&#x435;&#x442; &#x43d;&#x435;&#x434;&#x43e;&#x441;&#x442;&#x430;&#x44e;&#x449;&#x438;&#x435;.
+ */
+function crm_ensure_order_packages(PDO $pdo, int $orderId, int $placesCount): void
+{
+    $stmt = $pdo->prepare('SELECT COUNT(*) AS cnt, COALESCE(MAX(seq), 0) AS max_seq FROM order_packages WHERE order_id = ?');
+    $stmt->execute([$orderId]);
+    $row = $stmt->fetch();
+    $existing = (int) $row['cnt'];
+    $maxSeq = (int) $row['max_seq'];
+    if ($existing >= $placesCount) {
+        return;
+    }
+    $ins = $pdo->prepare('INSERT INTO order_packages (order_id, seq, barcode) VALUES (?,?,?)');
+    for ($seq = $maxSeq + 1; $seq <= $placesCount; $seq++) {
+        $ins->execute([$orderId, $seq, crm_generate_package_barcode($orderId, $seq)]);
+    }
+}
+
+/**
+ * &#x421;&#x43f;&#x43e;&#x441;&#x43e;&#x431; &#x43e;&#x43f;&#x43b;&#x430;&#x442;&#x44b; &#x43d;&#x430;&#x43b;&#x43e;&#x436;&#x435;&#x43d;&#x43d;&#x43e;&#x433;&#x43e; &#x43f;&#x43b;&#x430;&#x442;&#x435;&#x436;&#x430; &#x2014; &#x438;&#x441;&#x43f;&#x43e;&#x43b;&#x44c;&#x437;&#x443;&#x435;&#x442;&#x441;&#x44f; &#x442;&#x43e;&#x43b;&#x44c;&#x43a;&#x43e; &#x432; &#x43f;&#x43e;&#x434;&#x43f;&#x438;&#x441;&#x44f;&#x445; UI.
+ */
+function crm_cod_label(bool $isCod): string
+{
+    return $isCod ? "\u{41d}\u{430}\u{43b}\u{43e}\u{436}\u{435}\u{43d}\u{43d}\u{44b}\u{439} \u{43f}\u{43b}\u{430}\u{442}\u{451}\u{436}" : "\u{2014}";
+}
+
 function crm_payment_method_label(?string $method): string
 {
     return [

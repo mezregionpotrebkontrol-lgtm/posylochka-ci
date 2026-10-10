@@ -2,6 +2,9 @@
 require_once __DIR__ . '/includes/bootstrap.php';
 require_once __DIR__ . '/includes/email.php';
 require_once __DIR__ . '/includes/clientapi.php';
+require_once __DIR__ . '/includes/yookassa.php';
+require_once __DIR__ . '/includes/sms.php';
+require_once __DIR__ . '/includes/max.php';
 $user = crm_require_role(['admin', 'operator']);
 $pdo = crm_db();
 
@@ -15,6 +18,7 @@ if ($id) {
         http_response_code(404);
         die("\u{417}\u{430}\u{44f}\u{432}\u{43a}\u{430} \u{43d}\u{435} \u{43d}\u{430}\u{439}\u{434}\u{435}\u{43d}\u{430}.");
     }
+    crm_ensure_order_packages($pdo, $id, max(1, (int) $order['places_count']));
 }
 
 $clients = $pdo->query('SELECT id, name, phone FROM clients ORDER BY name')->fetchAll();
@@ -26,12 +30,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
     crm_csrf_check();
     $clientId = (int) ($_POST['client_id'] ?? 0);
     $pickupType = ($_POST['pickup_type'] ?? '') === 'courier' ? 'courier' : 'self';
+    $placesCount = max(1, (int) ($_POST['places_count'] ?? 1));
+    $isCod = !empty($_POST['is_cod']) ? 1 : 0;
+    $codAmount = $isCod && $_POST['cod_amount'] !== '' ? (float) $_POST['cod_amount'] : null;
     if (!$clientId) {
         crm_flash_set("\u{412}\u{44b}\u{431}\u{435}\u{440}\u{438}\u{442}\u{435} \u{43a}\u{43b}\u{438}\u{435}\u{43d}\u{442}\u{430}.", 'err');
     } else {
         $stmt = $pdo->prepare('INSERT INTO orders
-            (client_id, created_by, from_city, to_city, from_address, to_address, cargo_description, weight_kg, declared_value, price, planned_date, comment, pickup_type, status)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,\'new\')');
+            (client_id, created_by, from_city, to_city, from_address, to_address, cargo_description, weight_kg, places_count, declared_value, price, planned_date, comment, pickup_type, is_cod, cod_amount, status)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,\'new\')');
         $stmt->execute([
             $clientId,
             $user['id'],
@@ -41,15 +48,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
             trim($_POST['to_address'] ?? '') ?: null,
             trim($_POST['cargo_description'] ?? '') ?: null,
             $_POST['weight_kg'] !== '' ? (float) $_POST['weight_kg'] : null,
+            $placesCount,
             $_POST['declared_value'] !== '' ? (float) $_POST['declared_value'] : null,
             $_POST['price'] !== '' ? (float) $_POST['price'] : null,
             $_POST['planned_date'] !== '' ? $_POST['planned_date'] : null,
             trim($_POST['comment'] ?? '') ?: null,
             $pickupType,
+            $isCod,
+            $codAmount,
         ]);
         $newId = (int) $pdo->lastInsertId();
         $pdo->prepare("INSERT INTO order_status_history (order_id, status, changed_by, comment) VALUES (?, 'new', ?, '\u{417}\u{430}\u{44f}\u{432}\u{43a}\u{430} \u{441}\u{43e}\u{437}\u{434}\u{430}\u{43d}\u{430}')")
             ->execute([$newId, $user['id']]);
+        crm_ensure_order_packages($pdo, $newId, $placesCount);
         crm_flash_set("\u{417}\u{430}\u{44f}\u{432}\u{43a}\u{430} \u{2116}" . $newId . " \u{441}\u{43e}\u{437}\u{434}\u{430}\u{43d}\u{430}.");
         crm_redirect('/crm/order.php?id=' . $newId);
     }
@@ -59,7 +70,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
 if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update') {
     crm_csrf_check();
     $pickupType = ($_POST['pickup_type'] ?? '') === 'courier' ? 'courier' : 'self';
-    $stmt = $pdo->prepare('UPDATE orders SET from_city=?, to_city=?, from_address=?, to_address=?, cargo_description=?, weight_kg=?, declared_value=?, price=?, planned_date=?, comment=?, pickup_type=? WHERE id=?');
+    $placesCount = max(1, (int) ($_POST['places_count'] ?? 1));
+    $isCod = !empty($_POST['is_cod']) ? 1 : 0;
+    $codAmount = $isCod && $_POST['cod_amount'] !== '' ? (float) $_POST['cod_amount'] : null;
+    $stmt = $pdo->prepare('UPDATE orders SET from_city=?, to_city=?, from_address=?, to_address=?, cargo_description=?, weight_kg=?, places_count=?, declared_value=?, price=?, planned_date=?, comment=?, pickup_type=?, is_cod=?, cod_amount=? WHERE id=?');
     $stmt->execute([
         trim($_POST['from_city'] ?? '') ?: "\u{414}\u{435}\u{440}\u{431}\u{435}\u{43d}\u{442}",
         trim($_POST['to_city'] ?? '') ?: "\u{421}\u{430}\u{43d}\u{43a}\u{442}-\u{41f}\u{435}\u{442}\u{435}\u{440}\u{431}\u{443}\u{440}\u{433}",
@@ -67,13 +81,17 @@ if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') 
         trim($_POST['to_address'] ?? '') ?: null,
         trim($_POST['cargo_description'] ?? '') ?: null,
         $_POST['weight_kg'] !== '' ? (float) $_POST['weight_kg'] : null,
+        $placesCount,
         $_POST['declared_value'] !== '' ? (float) $_POST['declared_value'] : null,
         $_POST['price'] !== '' ? (float) $_POST['price'] : null,
         $_POST['planned_date'] !== '' ? $_POST['planned_date'] : null,
         trim($_POST['comment'] ?? '') ?: null,
         $pickupType,
+        $isCod,
+        $codAmount,
         $id,
     ]);
+    crm_ensure_order_packages($pdo, $id, $placesCount);
     crm_flash_set("\u{417}\u{430}\u{44f}\u{432}\u{43a}\u{430} \u{43e}\u{431}\u{43d}\u{43e}\u{432}\u{43b}\u{435}\u{43d}\u{430}.");
     crm_redirect('/crm/order.php?id=' . $id);
 }
@@ -102,7 +120,13 @@ if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') 
     $newStatus = $_POST['status'] ?? '';
     $allowed = ['new','accepted','collecting','in_transit','delivered','cancelled'];
     if (in_array($newStatus, $allowed, true)) {
-        $pdo->prepare('UPDATE orders SET status = ? WHERE id = ?')->execute([$newStatus, $id]);
+        if ($newStatus === 'delivered' && !empty($_POST['signature_data'])
+            && str_starts_with($_POST['signature_data'], 'data:image/png;base64,')) {
+            $pdo->prepare('UPDATE orders SET status = ?, recipient_signature = ? WHERE id = ?')
+                ->execute([$newStatus, $_POST['signature_data'], $id]);
+        } else {
+            $pdo->prepare('UPDATE orders SET status = ? WHERE id = ?')->execute([$newStatus, $id]);
+        }
         $pdo->prepare('INSERT INTO order_status_history (order_id, status, changed_by, comment) VALUES (?,?,?,?)')
             ->execute([$id, $newStatus, $user['id'], trim($_POST['status_comment'] ?? '') ?: null]);
         crm_notify_client_status($pdo, $order, $newStatus);
@@ -147,6 +171,56 @@ if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') 
     crm_csrf_check();
     $pdo->prepare('UPDATE orders SET payment_status = ? WHERE id = ?')->execute(['unpaid', $id]);
     crm_flash_set("\u{41e}\u{442}\u{43c}\u{435}\u{442}\u{43a}\u{430} \u{43f}\u{43e}\u{441}\u{442}\u{43e}\u{43f}\u{43b}\u{430}\u{442}\u{44b} \u{441}\u{43d}\u{44f}\u{442}\u{430}.");
+    crm_redirect('/crm/order.php?id=' . $id);
+}
+
+// &#x41d;&#x430;&#x43b;&#x43e;&#x436;&#x435;&#x43d;&#x43d;&#x44b;&#x439; &#x43f;&#x43b;&#x430;&#x442;&#x451;&#x436;: &#x43a;&#x443;&#x440;&#x44c;&#x435;&#x440;/&#x43c;&#x435;&#x43d;&#x435;&#x434;&#x436;&#x435;&#x440; &#x43e;&#x442;&#x43c;&#x435;&#x447;&#x430;&#x435;&#x442;, &#x447;&#x442;&#x43e; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x438;&#x43b; &#x43d;&#x430;&#x43b;&#x438;&#x447;&#x43d;&#x44b;&#x43c;&#x438; &#x43f;&#x440;&#x438; &#x432;&#x440;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x438;.
+if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'cod_collect_cash') {
+    crm_csrf_check();
+    $pdo->prepare("UPDATE orders SET payment_status = 'paid', payment_method = 'cash' WHERE id = ?")->execute([$id]);
+    $pdo->prepare("INSERT INTO order_status_history (order_id, status, changed_by, comment) VALUES (?, ?, ?, '\u{41d}\u{430}\u{43b}\u{43e}\u{436}\u{435}\u{43d}\u{43d}\u{44b}\u{439} \u{43f}\u{43b}\u{430}\u{442}\u{451}\u{436} \u{43f}\u{43e}\u{43b}\u{443}\u{447}\u{435}\u{43d} \u{43d}\u{430}\u{43b}\u{438}\u{447}\u{43d}\u{44b}\u{43c}\u{438} \u{43f}\u{440}\u{438} \u{432}\u{440}\u{443}\u{447}\u{435}\u{43d}\u{438}\u{438}')")
+        ->execute([$id, $order['status'], $user['id']]);
+    crm_flash_set("\u{41d}\u{430}\u{43b}\u{43e}\u{436}\u{435}\u{43d}\u{43d}\u{44b}\u{439} \u{43f}\u{43b}\u{430}\u{442}\u{451}\u{436} \u{43e}\u{442}\u{43c}\u{435}\u{447}\u{435}\u{43d} \u{43f}\u{43e}\u{43b}\u{443}\u{447}\u{435}\u{43d}\u{43d}\u{44b}\u{43c} \u{43d}\u{430}\u{43b}\u{438}\u{447}\u{43d}\u{44b}\u{43c}\u{438}.");
+    crm_redirect('/crm/order.php?id=' . $id);
+}
+
+// &#x41d;&#x430;&#x43b;&#x43e;&#x436;&#x435;&#x43d;&#x43d;&#x44b;&#x439; &#x43f;&#x43b;&#x430;&#x442;&#x451;&#x436;: &#x441;&#x433;&#x435;&#x43d;&#x435;&#x440;&#x438;&#x440;&#x43e;&#x432;&#x430;&#x442;&#x44c; &#x441;&#x441;&#x44b;&#x43b;&#x43a;&#x443; &#x43d;&#x430; &#x43e;&#x43f;&#x43b;&#x430;&#x442;&#x443; (&#x42e;Kassa) &#x438; &#x43e;&#x442;&#x43f;&#x440;&#x430;&#x432;&#x438;&#x442;&#x44c; &#x43a;&#x43b;&#x438;&#x435;&#x43d;&#x442;&#x443;.
+if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'cod_send_payment_link') {
+    crm_csrf_check();
+    $amount = (float) ($order['cod_amount'] ?? $order['price'] ?? 0);
+    if ($amount <= 0) {
+        crm_flash_set("\u{423} \u{437}\u{430}\u{44f}\u{432}\u{43a}\u{438} \u{43d}\u{435} \u{443}\u{43a}\u{430}\u{437}\u{430}\u{43d}\u{430} \u{441}\u{443}\u{43c}\u{43c}\u{430} \u{43d}\u{430}\u{43b}\u{43e}\u{436}\u{435}\u{43d}\u{43d}\u{43e}\u{433}\u{43e} \u{43f}\u{43b}\u{430}\u{442}\u{435}\u{436}\u{430}.", 'err');
+    } elseif (!crm_yookassa_ready()) {
+        crm_flash_set("\u{41e}\u{43d}\u{43b}\u{430}\u{439}\u{43d}-\u{43e}\u{43f}\u{43b}\u{430}\u{442}\u{430} \u{43d}\u{435} \u{43d}\u{430}\u{441}\u{442}\u{440}\u{43e}\u{435}\u{43d}\u{430} \u{432} config.php (\u{44e}Kassa).", 'err');
+    } else {
+        $clStmt = $pdo->prepare('SELECT name, phone FROM clients WHERE id = ?');
+        $clStmt->execute([$order['client_id']]);
+        $client = $clStmt->fetch();
+        $cfg = crm_config();
+        $baseUrl = rtrim($cfg['site']['base_url'] ?? '', '/');
+        $returnUrl = $baseUrl . '/app.html?paid_track=' . rawurlencode($order['track_code'] ?? '');
+        $phoneDigits = $client ? crm_phone_digits($client['phone']) : null;
+        [$payment, $err] = crm_yookassa_create_payment(
+            $amount,
+            "\u{417}\u{430}\u{44f}\u{432}\u{43a}\u{430} \u{2116}{$id} (\u{43d}\u{430}\u{43b}\u{43e}\u{436}\u{435}\u{43d}\u{43d}\u{44b}\u{439} \u{43f}\u{43b}\u{430}\u{442}\u{451}\u{436})",
+            $returnUrl,
+            ['order_id' => $id, 'cod' => 1],
+            $phoneDigits ? '+' . $phoneDigits : null
+        );
+        if ($err !== null || empty($payment['id']) || empty($payment['confirmation']['confirmation_url'])) {
+            crm_flash_set($err ?: "\u{41d}\u{435} \u{443}\u{434}\u{430}\u{43b}\u{43e}\u{441}\u{44c} \u{441}\u{43e}\u{437}\u{434}\u{430}\u{442}\u{44c} \u{43f}\u{43b}\u{430}\u{442}\u{451}\u{436}.", 'err');
+        } else {
+            $pdo->prepare('INSERT INTO yookassa_payments (order_id, yk_payment_id, amount, confirmation_url, status) VALUES (?,?,?,?,?)')
+                ->execute([$id, $payment['id'], $amount, $payment['confirmation']['confirmation_url'], $payment['status'] ?? 'pending']);
+            $link = $payment['confirmation']['confirmation_url'];
+            $sent = false;
+            if ($phoneDigits) {
+                $text = "\u{421}\u{441}\u{44b}\u{43b}\u{43a}\u{430} \u{43d}\u{430} \u{43e}\u{43f}\u{43b}\u{430}\u{442}\u{443} \u{437}\u{430}\u{44f}\u{432}\u{43a}\u{438} \u{2116}{$id}: {$link}";
+                $sent = crm_send_max_message(crm_phone_to_chat_id($client['phone']), $text) || crm_send_sms('+' . $phoneDigits, $text);
+            }
+            crm_flash_set("\u{421}\u{441}\u{44b}\u{43b}\u{43a}\u{430} \u{43d}\u{430} \u{43e}\u{43f}\u{43b}\u{430}\u{442}\u{443} \u{441}\u{43e}\u{437}\u{434}\u{430}\u{43d}\u{430}: {$link}" . ($sent ? " (\u{43e}\u{442}\u{43f}\u{440}\u{430}\u{432}\u{43b}\u{435}\u{43d}\u{430} \u{43a}\u{43b}\u{438}\u{435}\u{43d}\u{442}\u{443})" : " (\u{43e}\u{442}\u{43f}\u{440}\u{430}\u{432}\u{438}\u{442}\u{44c} \u{43a}\u{43b}\u{438}\u{435}\u{43d}\u{442}\u{443} \u{432}\u{440}\u{443}\u{447}\u{43d}\u{443}\u{44e} \u{2014} \u{430}\u{432}\u{442}\u{43e}\u{43e}\u{442}\u{43f}\u{440}\u{430}\u{432}\u{43a}\u{430} \u{43d}\u{435} \u{43d}\u{430}\u{441}\u{442}\u{440}\u{43e}\u{435}\u{43d}\u{430})"));
+        }
+    }
     crm_redirect('/crm/order.php?id=' . $id);
 }
 
@@ -230,6 +304,13 @@ if ($order) {
     $orderClaims = $claimsStmt->fetchAll();
 }
 
+$orderPackages = [];
+if ($order) {
+    $pkgStmt = $pdo->prepare('SELECT * FROM order_packages WHERE order_id = ? ORDER BY seq');
+    $pkgStmt->execute([$id]);
+    $orderPackages = $pkgStmt->fetchAll();
+}
+
 $currentRun = null;
 if ($order && $order['shipment_run_id']) {
     $rStmt = $pdo->prepare('SELECT * FROM shipment_runs WHERE id = ?');
@@ -284,6 +365,17 @@ require __DIR__ . '/includes/layout_top.php';
     <div class="form-row">
       <div><label>&#x421;&#x442;&#x43e;&#x438;&#x43c;&#x43e;&#x441;&#x442;&#x44c; &#x434;&#x43e;&#x441;&#x442;&#x430;&#x432;&#x43a;&#x438;, &#x20bd;</label><input type="number" step="0.01" name="price"></div>
       <div><label>&#x41f;&#x43b;&#x430;&#x43d;&#x438;&#x440;&#x443;&#x435;&#x43c;&#x430;&#x44f; &#x434;&#x430;&#x442;&#x430; &#x434;&#x43e;&#x441;&#x442;&#x430;&#x432;&#x43a;&#x438;</label><input type="date" name="planned_date"></div>
+    </div>
+    <div class="form-row">
+      <div><label>&#x41a;&#x43e;&#x43b;&#x438;&#x447;&#x435;&#x441;&#x442;&#x432;&#x43e; &#x43c;&#x435;&#x441;&#x442; (&#x433;&#x440;&#x443;&#x437;&#x43e;&#x432;)</label><input type="number" step="1" min="1" name="places_count" value="1"></div>
+      <div></div>
+    </div>
+    <div class="form-row" style="align-items:center;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="create_is_cod" name="is_cod" value="1" onchange="document.getElementById('create_cod_amount_wrap').style.display = this.checked ? 'block' : 'none';">
+        <label for="create_is_cod" style="margin:0;">&#x41d;&#x430;&#x43b;&#x43e;&#x436;&#x435;&#x43d;&#x43d;&#x44b;&#x439; &#x43f;&#x43b;&#x430;&#x442;&#x451;&#x436;</label>
+      </div>
+      <div id="create_cod_amount_wrap" style="display:none;"><label>&#x421;&#x443;&#x43c;&#x43c;&#x430; &#x43a; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x44e;, &#x20bd;</label><input type="number" step="0.01" name="cod_amount"></div>
     </div>
     <label>&#x41a;&#x43e;&#x43c;&#x43c;&#x435;&#x43d;&#x442;&#x430;&#x440;&#x438;&#x439;</label>
     <textarea name="comment"></textarea>
@@ -442,11 +534,87 @@ require __DIR__ . '/includes/layout_top.php';
       <div><label>&#x421;&#x442;&#x43e;&#x438;&#x43c;&#x43e;&#x441;&#x442;&#x44c; &#x434;&#x43e;&#x441;&#x442;&#x430;&#x432;&#x43a;&#x438;, &#x20bd;</label><input type="number" step="0.01" name="price" value="<?= e($order['price']) ?>"></div>
       <div><label>&#x41f;&#x43b;&#x430;&#x43d;&#x438;&#x440;&#x443;&#x435;&#x43c;&#x430;&#x44f; &#x434;&#x430;&#x442;&#x430; &#x434;&#x43e;&#x441;&#x442;&#x430;&#x432;&#x43a;&#x438;</label><input type="date" name="planned_date" value="<?= e($order['planned_date']) ?>"></div>
     </div>
+    <div class="form-row">
+      <div><label>&#x41a;&#x43e;&#x43b;&#x438;&#x447;&#x435;&#x441;&#x442;&#x432;&#x43e; &#x43c;&#x435;&#x441;&#x442; (&#x433;&#x440;&#x443;&#x437;&#x43e;&#x432;)</label><input type="number" step="1" min="1" name="places_count" value="<?= (int) max(1, (int) $order['places_count']) ?>"></div>
+      <div></div>
+    </div>
+    <div class="form-row" style="align-items:center;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="update_is_cod" name="is_cod" value="1" <?= !empty($order['is_cod']) ? 'checked' : '' ?> onchange="document.getElementById('update_cod_amount_wrap').style.display = this.checked ? 'block' : 'none';">
+        <label for="update_is_cod" style="margin:0;">&#x41d;&#x430;&#x43b;&#x43e;&#x436;&#x435;&#x43d;&#x43d;&#x44b;&#x439; &#x43f;&#x43b;&#x430;&#x442;&#x451;&#x436;</label>
+      </div>
+      <div id="update_cod_amount_wrap" style="<?= !empty($order['is_cod']) ? '' : 'display:none;' ?>"><label>&#x421;&#x443;&#x43c;&#x43c;&#x430; &#x43a; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x44e;, &#x20bd;</label><input type="number" step="0.01" name="cod_amount" value="<?= e($order['cod_amount']) ?>"></div>
+    </div>
     <label>&#x41a;&#x43e;&#x43c;&#x43c;&#x435;&#x43d;&#x442;&#x430;&#x440;&#x438;&#x439;</label>
     <textarea name="comment"><?= e($order['comment']) ?></textarea>
     <div class="form-actions"><button class="btn" type="submit">&#x421;&#x43e;&#x445;&#x440;&#x430;&#x43d;&#x438;&#x442;&#x44c; &#x438;&#x437;&#x43c;&#x435;&#x43d;&#x435;&#x43d;&#x438;&#x44f;</button></div>
   </form>
 </div>
+
+<?php
+    $codLinkStmt = $pdo->prepare('SELECT confirmation_url, status FROM yookassa_payments WHERE order_id = ? AND confirmation_url IS NOT NULL ORDER BY id DESC LIMIT 1');
+    $codLinkStmt->execute([$id]);
+    $codLink = $codLinkStmt->fetch();
+?>
+<?php if (!empty($order['is_cod'])): ?>
+<div class="card">
+  <h3 style="margin-top:0;">&#x41d;&#x430;&#x43b;&#x43e;&#x436;&#x435;&#x43d;&#x43d;&#x44b;&#x439; &#x43f;&#x43b;&#x430;&#x442;&#x451;&#x436;</h3>
+  <p>&#x421;&#x443;&#x43c;&#x43c;&#x430; &#x43a; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x44e;: <strong><?= crm_money((float) ($order['cod_amount'] ?? 0)) ?></strong>
+    &#x2014;
+    <?php if ($order['payment_status'] === 'paid'): ?>
+      <span class="badge badge-green">&#x41f;&#x43e;&#x43b;&#x443;&#x447;&#x435;&#x43d;&#x43e; (<?= e(crm_payment_method_label($order['payment_method'])) ?>)</span>
+    <?php else: ?>
+      <span class="badge badge-grey">&#x41e;&#x436;&#x438;&#x434;&#x430;&#x435;&#x442; &#x43e;&#x43f;&#x43b;&#x430;&#x442;&#x44b;</span>
+    <?php endif; ?>
+  </p>
+  <?php if ($order['payment_status'] !== 'paid'): ?>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <form method="post" class="inline">
+        <?= crm_csrf_field() ?>
+        <input type="hidden" name="action" value="cod_collect_cash">
+        <button class="btn small secondary" type="submit">&#x41f;&#x43e;&#x43b;&#x443;&#x447;&#x435;&#x43d;&#x43e; &#x43d;&#x430;&#x43b;&#x438;&#x447;&#x43d;&#x44b;&#x43c;&#x438; &#x43f;&#x440;&#x438; &#x432;&#x440;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x438;</button>
+      </form>
+      <form method="post" class="inline">
+        <?= crm_csrf_field() ?>
+        <input type="hidden" name="action" value="cod_send_payment_link">
+        <button class="btn small secondary" type="submit">&#x421;&#x43e;&#x437;&#x434;&#x430;&#x442;&#x44c; &#x438; &#x43e;&#x442;&#x43f;&#x440;&#x430;&#x432;&#x438;&#x442;&#x44c; &#x441;&#x441;&#x44b;&#x43b;&#x43a;&#x443; &#x43d;&#x430; &#x43e;&#x43d;&#x43b;&#x430;&#x439;&#x43d;-&#x43e;&#x43f;&#x43b;&#x430;&#x442;&#x443;</button>
+      </form>
+    </div>
+    <?php if ($codLink): ?>
+      <p class="text-muted" style="margin-top:10px;">&#x41f;&#x43e;&#x441;&#x43b;&#x435;&#x434;&#x43d;&#x44f;&#x44f; &#x441;&#x43e;&#x437;&#x434;&#x430;&#x43d;&#x43d;&#x430;&#x44f; &#x441;&#x441;&#x44b;&#x43b;&#x43a;&#x430; &#x43d;&#x430; &#x43e;&#x43f;&#x43b;&#x430;&#x442;&#x443; (&#x441;&#x442;&#x430;&#x442;&#x443;&#x441;: <?= e($codLink['status']) ?>): <a href="<?= e($codLink['confirmation_url']) ?>" target="_blank"><?= e($codLink['confirmation_url']) ?></a></p>
+    <?php endif; ?>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<div class="card">
+  <h3 style="margin-top:0;">&#x413;&#x440;&#x443;&#x437;&#x43e;&#x43c;&#x435;&#x441;&#x442;&#x430; (<?= (int) count($orderPackages) ?>)</h3>
+  <?php if (!$orderPackages): ?>
+    <div class="empty-state">&#x413;&#x440;&#x443;&#x437;&#x43e;&#x43c;&#x435;&#x441;&#x442;&#x430; &#x435;&#x449;&#x451; &#x43d;&#x435; &#x441;&#x444;&#x43e;&#x440;&#x43c;&#x438;&#x440;&#x43e;&#x432;&#x430;&#x43d;&#x44b;.</div>
+  <?php else: ?>
+    <table>
+      <thead><tr><th>#</th><th>&#x428;&#x442;&#x440;&#x438;&#x445;&#x43a;&#x43e;&#x434;</th><th>&#x421;&#x442;&#x430;&#x442;&#x443;&#x441;</th><th>&#x41e;&#x442;&#x441;&#x43a;&#x430;&#x43d;&#x438;&#x440;&#x43e;&#x432;&#x430;&#x43d;&#x43e;</th></tr></thead>
+      <tbody>
+        <?php foreach ($orderPackages as $pkg): ?>
+        <tr>
+          <td><?= (int) $pkg['seq'] ?></td>
+          <td><code><?= e($pkg['barcode']) ?></code></td>
+          <td><span class="badge <?= crm_package_status_class($pkg['status']) ?>"><?= e(crm_package_status_label($pkg['status'])) ?></span></td>
+          <td><?= $pkg['scanned_at'] ? e(crm_date($pkg['scanned_at'], 'd.m.Y H:i')) : "\u{2014}" ?></td>
+        </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+    <p style="margin-top:10px;"><a class="btn small secondary" href="/crm/package-labels.php?order_id=<?= (int) $id ?>" target="_blank">&#x41f;&#x435;&#x447;&#x430;&#x442;&#x44c; &#x44d;&#x442;&#x438;&#x43a;&#x435;&#x442;&#x43e;&#x43a;</a></p>
+  <?php endif; ?>
+</div>
+
+<?php if (!empty($order['recipient_signature'])): ?>
+<div class="card">
+  <h3 style="margin-top:0;">&#x41f;&#x43e;&#x434;&#x43f;&#x438;&#x441;&#x44c; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x430;&#x442;&#x435;&#x43b;&#x44f; &#x43f;&#x440;&#x438; &#x432;&#x440;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x438;</h3>
+  <img src="<?= e($order['recipient_signature']) ?>" alt="&#x41f;&#x43e;&#x434;&#x43f;&#x438;&#x441;&#x44c; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x430;&#x442;&#x435;&#x43b;&#x44f;" style="max-width:320px;border:1px solid #ddd;border-radius:6px;background:#fff;">
+</div>
+<?php endif; ?>
 
 <div class="card">
   <h3 style="margin-top:0;">&#x41a;&#x443;&#x440;&#x44c;&#x435;&#x440; &#x438; &#x43c;&#x430;&#x440;&#x448;&#x440;&#x443;&#x442;</h3>

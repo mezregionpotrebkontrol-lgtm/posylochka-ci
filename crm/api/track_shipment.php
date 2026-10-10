@@ -25,7 +25,7 @@ $history = $stmt->fetchAll();
 // Шаги показа на сайте, в порядке: принято → загружено → в пути → прибыло → вручено.
 // У CRM только 4 рабочих статуса (new/accepted/in_transit/delivered), поэтому
 // "загружено"/"прибыло" не имеют отдельной даты — остаются пустыми до вручения.
-$statusToStep = ['new' => 0, 'accepted' => 1, 'in_transit' => 2, 'delivered' => 4, 'cancelled' => null];
+$statusToStep = ['new' => 0, 'accepted' => 1, 'collecting' => 1, 'in_transit' => 2, 'delivered' => 4, 'cancelled' => null];
 $dates = [null, null, null, null, null];
 $stepIndex = 0;
 foreach ($history as $row) {

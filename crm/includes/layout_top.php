@@ -28,6 +28,7 @@ $companyName = crm_config()['company_name'] ?? "\u{41f}\u{43e}\u{441}\u{44b}\u{4
         <a href="/crm/clients.php" class="<?= ($activeNav ?? '') === 'clients' ? 'active' : '' ?>">&#x41a;&#x43b;&#x438;&#x435;&#x43d;&#x442;&#x44b;</a>
         <a href="/crm/finance.php" class="<?= ($activeNav ?? '') === 'finance' ? 'active' : '' ?>">&#x424;&#x438;&#x43d;&#x430;&#x43d;&#x441;&#x44b;</a>
         <a href="/crm/warehouse.php" class="<?= ($activeNav ?? '') === 'warehouse' ? 'active' : '' ?>">&#x421;&#x43a;&#x43b;&#x430;&#x434;</a>
+        <a href="/crm/packages-scan.php" class="<?= ($activeNav ?? '') === 'packages-scan' ? 'active' : '' ?>">&#x421;&#x43a;&#x430;&#x43d;&#x438;&#x440;&#x43e;&#x432;&#x430;&#x43d;&#x438;&#x435; &#x43c;&#x435;&#x441;&#x442;</a>
         <a href="/crm/leads.php" class="<?= ($activeNav ?? '') === 'leads' ? 'active' : '' ?>">&#x417;&#x430;&#x44f;&#x432;&#x43a;&#x438; &#x441; &#x441;&#x430;&#x439;&#x442;&#x430;</a>
         <a href="/crm/reviews.php" class="<?= ($activeNav ?? '') === 'reviews' ? 'active' : '' ?>">&#x41e;&#x442;&#x437;&#x44b;&#x432;&#x44b;</a>
         <a href="/crm/claims.php" class="<?= ($activeNav ?? '') === 'claims' ? 'active' : '' ?>">&#x41f;&#x440;&#x435;&#x442;&#x435;&#x43d;&#x437;&#x438;&#x438;</a>
@@ -39,6 +40,7 @@ $companyName = crm_config()['company_name'] ?? "\u{41f}\u{43e}\u{441}\u{44b}\u{4
       <?php endif; ?>
       <?php if ($user['role'] === 'courier'): ?>
         <a href="/crm/my-orders.php" class="<?= ($activeNav ?? '') === 'my-orders' ? 'active' : '' ?>">&#x41c;&#x43e;&#x438; &#x434;&#x43e;&#x441;&#x442;&#x430;&#x432;&#x43a;&#x438;</a>
+        <a href="/crm/packages-scan.php" class="<?= ($activeNav ?? '') === 'packages-scan' ? 'active' : '' ?>">&#x421;&#x43a;&#x430;&#x43d;&#x438;&#x440;&#x43e;&#x432;&#x430;&#x43d;&#x438;&#x435; &#x43c;&#x435;&#x441;&#x442;</a>
       <?php endif; ?>
     </nav>
     <div class="user-box">

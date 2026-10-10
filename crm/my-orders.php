@@ -18,7 +18,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'chang
     $ord = $stmt->fetch();
 
     if ($ord && in_array($newStatus, $courierAllowedStatuses, true)) {
-        $pdo->prepare('UPDATE orders SET status = ? WHERE id = ?')->execute([$newStatus, $orderId]);
+        if ($newStatus === 'delivered' && !empty($_POST['signature_data'])
+            && str_starts_with($_POST['signature_data'], 'data:image/png;base64,')) {
+            $pdo->prepare('UPDATE orders SET status = ?, recipient_signature = ? WHERE id = ?')
+                ->execute([$newStatus, $_POST['signature_data'], $orderId]);
+        } else {
+            $pdo->prepare('UPDATE orders SET status = ? WHERE id = ?')->execute([$newStatus, $orderId]);
+        }
         $pdo->prepare('INSERT INTO order_status_history (order_id, status, changed_by, comment) VALUES (?,?,?,?)')
             ->execute([$orderId, $newStatus, $user['id'], "\u{418}\u{437}\u{43c}\u{435}\u{43d}\u{435}\u{43d}\u{43e} \u{43a}\u{443}\u{440}\u{44c}\u{435}\u{440}\u{43e}\u{43c}"]);
         crm_notify_client_status($pdo, $ord, $newStatus);
@@ -52,7 +58,10 @@ require __DIR__ . '/includes/layout_top.php';
 ?>
 
 <div class="card">
-  <h3 style="margin-top:0;">&#x422;&#x435;&#x43a;&#x443;&#x449;&#x438;&#x435; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x438; (<?= count($activeOrders) ?>)</h3>
+  <h3 style="margin-top:0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+    <span>&#x422;&#x435;&#x43a;&#x443;&#x449;&#x438;&#x435; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x438; (<?= count($activeOrders) ?>)</span>
+    <a class="btn small secondary" href="/crm/route-sheet.php" target="_blank">&#x41c;&#x430;&#x440;&#x448;&#x440;&#x443;&#x442;&#x43d;&#x44b;&#x439; &#x43b;&#x438;&#x441;&#x442; &#x43d;&#x430; &#x441;&#x435;&#x433;&#x43e;&#x434;&#x43d;&#x44f;</a>
+  </h3>
   <?php if (!$activeOrders): ?>
     <div class="empty-state">&#x41f;&#x43e;&#x43a;&#x430; &#x43d;&#x435;&#x442; &#x43d;&#x430;&#x437;&#x43d;&#x430;&#x447;&#x435;&#x43d;&#x43d;&#x44b;&#x445; &#x437;&#x430;&#x44f;&#x432;&#x43e;&#x43a;.</div>
   <?php else: ?>
@@ -83,7 +92,8 @@ require __DIR__ . '/includes/layout_top.php';
                 <button class="btn small" type="submit">&#x412; &#x43f;&#x443;&#x442;&#x438;</button>
               <?php elseif ($o['status'] === 'in_transit'): ?>
                 <input type="hidden" name="status" value="delivered">
-                <button class="btn small" type="submit">&#x414;&#x43e;&#x441;&#x442;&#x430;&#x432;&#x43b;&#x435;&#x43d;&#x43e;</button>
+                <input type="hidden" name="signature_data" class="signature-data-input">
+                <button class="btn small" type="button" onclick="crmOpenSignaturePad(this.closest('form'))">&#x414;&#x43e;&#x441;&#x442;&#x430;&#x432;&#x43b;&#x435;&#x43d;&#x43e;</button>
               <?php endif; ?>
             </form>
           </td>
@@ -113,5 +123,82 @@ require __DIR__ . '/includes/layout_top.php';
     </table>
   <?php endif; ?>
 </div>
+
+<div id="signature-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:8px;padding:16px;max-width:420px;width:92%;">
+    <h3 style="margin-top:0;">&#x41f;&#x43e;&#x434;&#x43f;&#x438;&#x441;&#x44c; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x430;&#x442;&#x435;&#x43b;&#x44f;</h3>
+    <p class="text-muted" style="margin-top:-8px;">&#x41f;&#x43e;&#x43f;&#x440;&#x43e;&#x441;&#x438;&#x442;&#x435; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x430;&#x442;&#x435;&#x43b;&#x44f; &#x43f;&#x43e;&#x434;&#x43f;&#x438;&#x441;&#x430;&#x442;&#x44c;&#x441;&#x44f; &#x43f;&#x430;&#x43b;&#x44c;&#x446;&#x435;&#x43c; &#x438;&#x43b;&#x438; &#x441;&#x442;&#x438;&#x43b;&#x443;&#x441;&#x43e;&#x43c; &#x43d;&#x438;&#x436;&#x435;.</p>
+    <canvas id="signature-canvas" width="360" height="180" style="border:1px solid #ccc;border-radius:6px;width:100%;touch-action:none;background:#fff;"></canvas>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+      <button type="button" class="btn small secondary" onclick="crmClearSignaturePad()">&#x41e;&#x447;&#x438;&#x441;&#x442;&#x438;&#x442;&#x44c;</button>
+      <button type="button" class="btn small secondary" onclick="crmCloseSignaturePad()">&#x41e;&#x442;&#x43c;&#x435;&#x43d;&#x430;</button>
+      <button type="button" class="btn small" onclick="crmConfirmSignaturePad()">&#x41f;&#x43e;&#x434;&#x442;&#x432;&#x435;&#x440;&#x434;&#x438;&#x442;&#x44c; &#x438; &#x43e;&#x442;&#x43f;&#x440;&#x430;&#x432;&#x438;&#x442;&#x44c;</button>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var canvas = document.getElementById('signature-canvas');
+  var ctx = canvas.getContext('2d');
+  var drawing = false;
+  var activeForm = null;
+
+  function pos(evt) {
+    var rect = canvas.getBoundingClientRect();
+    var scaleX = canvas.width / rect.width;
+    var scaleY = canvas.height / rect.height;
+    var clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+    var clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+    return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+  }
+
+  function start(evt) {
+    drawing = true;
+    var p = pos(evt);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    evt.preventDefault();
+  }
+  function move(evt) {
+    if (!drawing) return;
+    var p = pos(evt);
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#000';
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    evt.preventDefault();
+  }
+  function end() { drawing = false; }
+
+  canvas.addEventListener('mousedown', start);
+  canvas.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', end);
+  canvas.addEventListener('touchstart', start, { passive: false });
+  canvas.addEventListener('touchmove', move, { passive: false });
+  canvas.addEventListener('touchend', end);
+
+  window.crmOpenSignaturePad = function (form) {
+    activeForm = form;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    document.getElementById('signature-modal-overlay').style.display = 'flex';
+  };
+  window.crmClearSignaturePad = function () {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
+  window.crmCloseSignaturePad = function () {
+    document.getElementById('signature-modal-overlay').style.display = 'none';
+    activeForm = null;
+  };
+  window.crmConfirmSignaturePad = function () {
+    if (!activeForm) return;
+    var dataUrl = canvas.toDataURL('image/png');
+    var input = activeForm.querySelector('.signature-data-input');
+    if (input) input.value = dataUrl;
+    document.getElementById('signature-modal-overlay').style.display = 'none';
+    activeForm.submit();
+  };
+})();
+</script>
 
 <?php require __DIR__ . '/includes/layout_bottom.php'; ?>
