@@ -320,7 +320,7 @@ require __DIR__ . '/includes/layout_top.php';
     function recalc() {
       var weight = document.getElementById('r-weight').value;
       if (!weight || parseFloat(weight) <= 0) {
-        resultEl.textContent = '&#x2014;';
+        resultEl.textContent = '\u2014';
         return;
       }
       var params = new URLSearchParams({
@@ -337,12 +337,12 @@ require __DIR__ . '/includes/layout_top.php';
         .then(function (r) { return r.json(); })
         .then(function (data) {
           if (data.ok && data.totals) {
-            resultEl.textContent = Math.round(data.totals.total).toLocaleString('ru-RU') + ' &#x20bd;';
+            resultEl.textContent = Math.round(data.totals.total).toLocaleString('ru-RU') + ' \u20bd';
           } else {
-            resultEl.textContent = '&#x41d;&#x435; &#x443;&#x434;&#x430;&#x43b;&#x43e;&#x441;&#x44c; &#x440;&#x430;&#x441;&#x441;&#x447;&#x438;&#x442;&#x430;&#x442;&#x44c; &#x2014; &#x43f;&#x440;&#x43e;&#x432;&#x435;&#x440;&#x44c;&#x442;&#x435; &#x433;&#x43e;&#x440;&#x43e;&#x434;&#x430;';
+            resultEl.textContent = '\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0440\u0430\u0441\u0441\u0447\u0438\u0442\u0430\u0442\u044c \u2014 \u043f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0433\u043e\u0440\u043e\u0434\u0430';
           }
         })
-        .catch(function () { resultEl.textContent = '&#x2014;'; });
+        .catch(function () { resultEl.textContent = '\u2014'; });
     }
 
     form.querySelectorAll('input, select').forEach(function (el) {
