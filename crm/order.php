@@ -13,7 +13,7 @@ if ($id) {
     $order = $stmt->fetch();
     if (!$order) {
         http_response_code(404);
-        die('Заявка не найдена.');
+        die("\u{417}\u{430}\u{44f}\u{432}\u{43a}\u{430} \u{43d}\u{435} \u{43d}\u{430}\u{439}\u{434}\u{435}\u{43d}\u{430}.");
     }
 }
 
@@ -21,13 +21,13 @@ $clients = $pdo->query('SELECT id, name, phone FROM clients ORDER BY name')->fet
 $couriers = $pdo->query("SELECT id, name FROM users WHERE role = 'courier' AND active = 1 ORDER BY name")->fetchAll();
 $formingRuns = $pdo->query("SELECT id, from_city, to_city, run_date FROM shipment_runs WHERE status = 'forming' ORDER BY run_date IS NULL, run_date, id DESC")->fetchAll();
 
-// Создание новой заявки
+// &#x421;&#x43e;&#x437;&#x434;&#x430;&#x43d;&#x438;&#x435; &#x43d;&#x43e;&#x432;&#x43e;&#x439; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x438;
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'create') {
     crm_csrf_check();
     $clientId = (int) ($_POST['client_id'] ?? 0);
     $pickupType = ($_POST['pickup_type'] ?? '') === 'courier' ? 'courier' : 'self';
     if (!$clientId) {
-        crm_flash_set('Выберите клиента.', 'err');
+        crm_flash_set("\u{412}\u{44b}\u{431}\u{435}\u{440}\u{438}\u{442}\u{435} \u{43a}\u{43b}\u{438}\u{435}\u{43d}\u{442}\u{430}.", 'err');
     } else {
         $stmt = $pdo->prepare('INSERT INTO orders
             (client_id, created_by, from_city, to_city, from_address, to_address, cargo_description, weight_kg, declared_value, price, planned_date, comment, pickup_type, status)
@@ -35,8 +35,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
         $stmt->execute([
             $clientId,
             $user['id'],
-            trim($_POST['from_city'] ?? '') ?: 'Дербент',
-            trim($_POST['to_city'] ?? '') ?: 'Санкт-Петербург',
+            trim($_POST['from_city'] ?? '') ?: "\u{414}\u{435}\u{440}\u{431}\u{435}\u{43d}\u{442}",
+            trim($_POST['to_city'] ?? '') ?: "\u{421}\u{430}\u{43d}\u{43a}\u{442}-\u{41f}\u{435}\u{442}\u{435}\u{440}\u{431}\u{443}\u{440}\u{433}",
             trim($_POST['from_address'] ?? '') ?: null,
             trim($_POST['to_address'] ?? '') ?: null,
             trim($_POST['cargo_description'] ?? '') ?: null,
@@ -48,21 +48,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
             $pickupType,
         ]);
         $newId = (int) $pdo->lastInsertId();
-        $pdo->prepare('INSERT INTO order_status_history (order_id, status, changed_by, comment) VALUES (?, \'new\', ?, \'Заявка создана\')')
+        $pdo->prepare("INSERT INTO order_status_history (order_id, status, changed_by, comment) VALUES (?, 'new', ?, '\u{417}\u{430}\u{44f}\u{432}\u{43a}\u{430} \u{441}\u{43e}\u{437}\u{434}\u{430}\u{43d}\u{430}')")
             ->execute([$newId, $user['id']]);
-        crm_flash_set('Заявка №' . $newId . ' создана.');
+        crm_flash_set("\u{417}\u{430}\u{44f}\u{432}\u{43a}\u{430} \u{2116}" . $newId . " \u{441}\u{43e}\u{437}\u{434}\u{430}\u{43d}\u{430}.");
         crm_redirect('/crm/order.php?id=' . $newId);
     }
 }
 
-// Обновление существующей заявки (данные)
+// &#x41e;&#x431;&#x43d;&#x43e;&#x432;&#x43b;&#x435;&#x43d;&#x438;&#x435; &#x441;&#x443;&#x449;&#x435;&#x441;&#x442;&#x432;&#x443;&#x44e;&#x449;&#x435;&#x439; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x438; (&#x434;&#x430;&#x43d;&#x43d;&#x44b;&#x435;)
 if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update') {
     crm_csrf_check();
     $pickupType = ($_POST['pickup_type'] ?? '') === 'courier' ? 'courier' : 'self';
     $stmt = $pdo->prepare('UPDATE orders SET from_city=?, to_city=?, from_address=?, to_address=?, cargo_description=?, weight_kg=?, declared_value=?, price=?, planned_date=?, comment=?, pickup_type=? WHERE id=?');
     $stmt->execute([
-        trim($_POST['from_city'] ?? '') ?: 'Дербент',
-        trim($_POST['to_city'] ?? '') ?: 'Санкт-Петербург',
+        trim($_POST['from_city'] ?? '') ?: "\u{414}\u{435}\u{440}\u{431}\u{435}\u{43d}\u{442}",
+        trim($_POST['to_city'] ?? '') ?: "\u{421}\u{430}\u{43d}\u{43a}\u{442}-\u{41f}\u{435}\u{442}\u{435}\u{440}\u{431}\u{443}\u{440}\u{433}",
         trim($_POST['from_address'] ?? '') ?: null,
         trim($_POST['to_address'] ?? '') ?: null,
         trim($_POST['cargo_description'] ?? '') ?: null,
@@ -74,29 +74,29 @@ if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') 
         $pickupType,
         $id,
     ]);
-    crm_flash_set('Заявка обновлена.');
+    crm_flash_set("\u{417}\u{430}\u{44f}\u{432}\u{43a}\u{430} \u{43e}\u{431}\u{43d}\u{43e}\u{432}\u{43b}\u{435}\u{43d}\u{430}.");
     crm_redirect('/crm/order.php?id=' . $id);
 }
 
-// Назначение курьера
+// &#x41d;&#x430;&#x437;&#x43d;&#x430;&#x447;&#x435;&#x43d;&#x438;&#x435; &#x43a;&#x443;&#x440;&#x44c;&#x435;&#x440;&#x430;
 if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'assign_courier') {
     crm_csrf_check();
     $courierId = $_POST['courier_id'] !== '' ? (int) $_POST['courier_id'] : null;
     $pdo->prepare('UPDATE orders SET courier_id = ? WHERE id = ?')->execute([$courierId, $id]);
-    crm_flash_set('Курьер обновлён.');
+    crm_flash_set("\u{41a}\u{443}\u{440}\u{44c}\u{435}\u{440} \u{43e}\u{431}\u{43d}\u{43e}\u{432}\u{43b}\u{451}\u{43d}.");
     crm_redirect('/crm/order.php?id=' . $id);
 }
 
-// Назначение/снятие сборного рейса
+// &#x41d;&#x430;&#x437;&#x43d;&#x430;&#x447;&#x435;&#x43d;&#x438;&#x435;/&#x441;&#x43d;&#x44f;&#x442;&#x438;&#x435; &#x441;&#x431;&#x43e;&#x440;&#x43d;&#x43e;&#x433;&#x43e; &#x440;&#x435;&#x439;&#x441;&#x430;
 if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'assign_shipment_run') {
     crm_csrf_check();
     $runId = $_POST['shipment_run_id'] !== '' ? (int) $_POST['shipment_run_id'] : null;
     $pdo->prepare('UPDATE orders SET shipment_run_id = ? WHERE id = ?')->execute([$runId, $id]);
-    crm_flash_set($runId ? 'Заявка добавлена в сборный рейс.' : 'Заявка убрана из сборного рейса.');
+    crm_flash_set($runId ? "\u{417}\u{430}\u{44f}\u{432}\u{43a}\u{430} \u{434}\u{43e}\u{431}\u{430}\u{432}\u{43b}\u{435}\u{43d}\u{430} \u{432} \u{441}\u{431}\u{43e}\u{440}\u{43d}\u{44b}\u{439} \u{440}\u{435}\u{439}\u{441}." : "\u{417}\u{430}\u{44f}\u{432}\u{43a}\u{430} \u{443}\u{431}\u{440}\u{430}\u{43d}\u{430} \u{438}\u{437} \u{441}\u{431}\u{43e}\u{440}\u{43d}\u{43e}\u{433}\u{43e} \u{440}\u{435}\u{439}\u{441}\u{430}.");
     crm_redirect('/crm/order.php?id=' . $id);
 }
 
-// Смена статуса
+// &#x421;&#x43c;&#x435;&#x43d;&#x430; &#x441;&#x442;&#x430;&#x442;&#x443;&#x441;&#x430;
 if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'change_status') {
     crm_csrf_check();
     $newStatus = $_POST['status'] ?? '';
@@ -107,23 +107,23 @@ if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') 
             ->execute([$id, $newStatus, $user['id'], trim($_POST['status_comment'] ?? '') ?: null]);
         crm_notify_client_status($pdo, $order, $newStatus);
         if ($newStatus === 'delivered') {
-            crm_notify_owner('Заявка №' . $id . ' (' . $order['from_city'] . ' → ' . $order['to_city'] . ') отмечена как доставленная.');
+            crm_notify_owner("\u{417}\u{430}\u{44f}\u{432}\u{43a}\u{430} \u{2116}" . $id . ' (' . $order['from_city'] . " \u{2192} " . $order['to_city'] . ") \u{43e}\u{442}\u{43c}\u{435}\u{447}\u{435}\u{43d}\u{430} \u{43a}\u{430}\u{43a} \u{434}\u{43e}\u{441}\u{442}\u{430}\u{432}\u{43b}\u{435}\u{43d}\u{43d}\u{430}\u{44f}.");
         }
-        crm_flash_set('Статус изменён на «' . crm_order_status_label($newStatus) . '».');
+        crm_flash_set("\u{421}\u{442}\u{430}\u{442}\u{443}\u{441} \u{438}\u{437}\u{43c}\u{435}\u{43d}\u{451}\u{43d} \u{43d}\u{430} \u{ab}" . crm_order_status_label($newStatus) . "\u{bb}.");
     }
     crm_redirect('/crm/order.php?id=' . $id);
 }
 
-// Отметка оплаты прямо из заявки
+// &#x41e;&#x442;&#x43c;&#x435;&#x442;&#x43a;&#x430; &#x43e;&#x43f;&#x43b;&#x430;&#x442;&#x44b; &#x43f;&#x440;&#x44f;&#x43c;&#x43e; &#x438;&#x437; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x438;
 if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'mark_paid') {
     crm_csrf_check();
     $allowedMethods = ['online', 'cash', 'terminal', 'invoice'];
     $method = $_POST['payment_method'] ?? '';
     if (!in_array($method, $allowedMethods, true)) {
-        crm_flash_set('Выберите способ оплаты.', 'err');
+        crm_flash_set("\u{412}\u{44b}\u{431}\u{435}\u{440}\u{438}\u{442}\u{435} \u{441}\u{43f}\u{43e}\u{441}\u{43e}\u{431} \u{43e}\u{43f}\u{43b}\u{430}\u{442}\u{44b}.", 'err');
     } else {
         $pdo->prepare('UPDATE orders SET payment_status = ?, payment_method = ? WHERE id = ?')->execute(['paid', $method, $id]);
-        crm_flash_set('Заявка отмечена оплаченной (' . crm_payment_method_label($method) . ').');
+        crm_flash_set("\u{417}\u{430}\u{44f}\u{432}\u{43a}\u{430} \u{43e}\u{442}\u{43c}\u{435}\u{447}\u{435}\u{43d}\u{430} \u{43e}\u{43f}\u{43b}\u{430}\u{447}\u{435}\u{43d}\u{43d}\u{43e}\u{439} (" . crm_payment_method_label($method) . ').');
     }
     crm_redirect('/crm/order.php?id=' . $id);
 }
@@ -131,41 +131,41 @@ if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') 
 if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'unmark_paid') {
     crm_csrf_check();
     $pdo->prepare('UPDATE orders SET payment_status = ?, payment_method = NULL WHERE id = ?')->execute(['unpaid', $id]);
-    crm_flash_set('Отметка оплаты снята.');
+    crm_flash_set("\u{41e}\u{442}\u{43c}\u{435}\u{442}\u{43a}\u{430} \u{43e}\u{43f}\u{43b}\u{430}\u{442}\u{44b} \u{441}\u{43d}\u{44f}\u{442}\u{430}.");
     crm_redirect('/crm/order.php?id=' . $id);
 }
 
-// Постоплата — договорились, что клиент заплатит после получения груза
+// &#x41f;&#x43e;&#x441;&#x442;&#x43e;&#x43f;&#x43b;&#x430;&#x442;&#x430; &#x2014; &#x434;&#x43e;&#x433;&#x43e;&#x432;&#x43e;&#x440;&#x438;&#x43b;&#x438;&#x441;&#x44c;, &#x447;&#x442;&#x43e; &#x43a;&#x43b;&#x438;&#x435;&#x43d;&#x442; &#x437;&#x430;&#x43f;&#x43b;&#x430;&#x442;&#x438;&#x442; &#x43f;&#x43e;&#x441;&#x43b;&#x435; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x44f; &#x433;&#x440;&#x443;&#x437;&#x430;
 if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'mark_postpaid') {
     crm_csrf_check();
     $pdo->prepare('UPDATE orders SET payment_status = ? WHERE id = ?')->execute(['postpaid', $id]);
-    crm_flash_set('Заявка отмечена как постоплата (клиент заплатит после доставки).');
+    crm_flash_set("\u{417}\u{430}\u{44f}\u{432}\u{43a}\u{430} \u{43e}\u{442}\u{43c}\u{435}\u{447}\u{435}\u{43d}\u{430} \u{43a}\u{430}\u{43a} \u{43f}\u{43e}\u{441}\u{442}\u{43e}\u{43f}\u{43b}\u{430}\u{442}\u{430} (\u{43a}\u{43b}\u{438}\u{435}\u{43d}\u{442} \u{437}\u{430}\u{43f}\u{43b}\u{430}\u{442}\u{438}\u{442} \u{43f}\u{43e}\u{441}\u{43b}\u{435} \u{434}\u{43e}\u{441}\u{442}\u{430}\u{432}\u{43a}\u{438}).");
     crm_redirect('/crm/order.php?id=' . $id);
 }
 
 if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'unmark_postpaid') {
     crm_csrf_check();
     $pdo->prepare('UPDATE orders SET payment_status = ? WHERE id = ?')->execute(['unpaid', $id]);
-    crm_flash_set('Отметка постоплаты снята.');
+    crm_flash_set("\u{41e}\u{442}\u{43c}\u{435}\u{442}\u{43a}\u{430} \u{43f}\u{43e}\u{441}\u{442}\u{43e}\u{43f}\u{43b}\u{430}\u{442}\u{44b} \u{441}\u{43d}\u{44f}\u{442}\u{430}.");
     crm_redirect('/crm/order.php?id=' . $id);
 }
 
-// Рассрочка — график платежей
+// &#x420;&#x430;&#x441;&#x441;&#x440;&#x43e;&#x447;&#x43a;&#x430; &#x2014; &#x433;&#x440;&#x430;&#x444;&#x438;&#x43a; &#x43f;&#x43b;&#x430;&#x442;&#x435;&#x436;&#x435;&#x439;
 if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add_installment') {
     crm_csrf_check();
     $amount = (float) str_replace(',', '.', $_POST['amount'] ?? '0');
     $dueDate = $_POST['due_date'] !== '' ? $_POST['due_date'] : null;
     if ($amount <= 0) {
-        crm_flash_set('Укажите сумму платежа больше нуля.', 'err');
+        crm_flash_set("\u{423}\u{43a}\u{430}\u{436}\u{438}\u{442}\u{435} \u{441}\u{443}\u{43c}\u{43c}\u{443} \u{43f}\u{43b}\u{430}\u{442}\u{435}\u{436}\u{430} \u{431}\u{43e}\u{43b}\u{44c}\u{448}\u{435} \u{43d}\u{443}\u{43b}\u{44f}.", 'err');
     } else {
         $pdo->prepare('INSERT INTO order_installments (order_id, due_date, amount) VALUES (?,?,?)')
             ->execute([$id, $dueDate, $amount]);
-        // Отмечаем, что заявка оплачивается в рассрочку (если ещё не отмечена иначе).
+        // &#x41e;&#x442;&#x43c;&#x435;&#x447;&#x430;&#x435;&#x43c;, &#x447;&#x442;&#x43e; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x430; &#x43e;&#x43f;&#x43b;&#x430;&#x447;&#x438;&#x432;&#x430;&#x435;&#x442;&#x441;&#x44f; &#x432; &#x440;&#x430;&#x441;&#x441;&#x440;&#x43e;&#x447;&#x43a;&#x443; (&#x435;&#x441;&#x43b;&#x438; &#x435;&#x449;&#x451; &#x43d;&#x435; &#x43e;&#x442;&#x43c;&#x435;&#x447;&#x435;&#x43d;&#x430; &#x438;&#x43d;&#x430;&#x447;&#x435;).
         if ($order['payment_method'] !== 'installment' || $order['payment_status'] === 'unpaid') {
             $pdo->prepare('UPDATE orders SET payment_method = ?, payment_status = ? WHERE id = ?')
                 ->execute(['installment', 'unpaid', $id]);
         }
-        crm_flash_set('Платёж добавлен в график рассрочки.');
+        crm_flash_set("\u{41f}\u{43b}\u{430}\u{442}\u{451}\u{436} \u{434}\u{43e}\u{431}\u{430}\u{432}\u{43b}\u{435}\u{43d} \u{432} \u{433}\u{440}\u{430}\u{444}\u{438}\u{43a} \u{440}\u{430}\u{441}\u{441}\u{440}\u{43e}\u{447}\u{43a}\u{438}.");
     }
     crm_redirect('/crm/order.php?id=' . $id);
 }
@@ -177,12 +177,12 @@ if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') 
     $chk->execute([$instId, $id]);
     if ($chk->fetch()) {
         $pdo->prepare('UPDATE order_installments SET status = "paid", paid_at = NOW() WHERE id = ?')->execute([$instId]);
-        // Если график полностью оплачен — переводим заявку в "Оплачен".
+        // &#x415;&#x441;&#x43b;&#x438; &#x433;&#x440;&#x430;&#x444;&#x438;&#x43a; &#x43f;&#x43e;&#x43b;&#x43d;&#x43e;&#x441;&#x442;&#x44c;&#x44e; &#x43e;&#x43f;&#x43b;&#x430;&#x447;&#x435;&#x43d; &#x2014; &#x43f;&#x435;&#x440;&#x435;&#x432;&#x43e;&#x434;&#x438;&#x43c; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x443; &#x432; "&#x41e;&#x43f;&#x43b;&#x430;&#x447;&#x435;&#x43d;".
         $totals = crm_order_installments_totals($pdo, $id);
         if ($totals['cnt'] > 0 && $totals['paid_cnt'] === $totals['cnt']) {
             $pdo->prepare('UPDATE orders SET payment_status = "paid", payment_method = "installment" WHERE id = ?')->execute([$id]);
         }
-        crm_flash_set('Платёж отмечен оплаченным.');
+        crm_flash_set("\u{41f}\u{43b}\u{430}\u{442}\u{451}\u{436} \u{43e}\u{442}\u{43c}\u{435}\u{447}\u{435}\u{43d} \u{43e}\u{43f}\u{43b}\u{430}\u{447}\u{435}\u{43d}\u{43d}\u{44b}\u{43c}.");
     }
     crm_redirect('/crm/order.php?id=' . $id);
 }
@@ -194,11 +194,11 @@ if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') 
     $chk->execute([$instId, $id]);
     if ($chk->fetch()) {
         $pdo->prepare('UPDATE order_installments SET status = "pending", paid_at = NULL WHERE id = ?')->execute([$instId]);
-        // Если заявка была отмечена "Оплачен" по рассрочке — возвращаем в "Не оплачен".
+        // &#x415;&#x441;&#x43b;&#x438; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x430; &#x431;&#x44b;&#x43b;&#x430; &#x43e;&#x442;&#x43c;&#x435;&#x447;&#x435;&#x43d;&#x430; "&#x41e;&#x43f;&#x43b;&#x430;&#x447;&#x435;&#x43d;" &#x43f;&#x43e; &#x440;&#x430;&#x441;&#x441;&#x440;&#x43e;&#x447;&#x43a;&#x435; &#x2014; &#x432;&#x43e;&#x437;&#x432;&#x440;&#x430;&#x449;&#x430;&#x435;&#x43c; &#x432; "&#x41d;&#x435; &#x43e;&#x43f;&#x43b;&#x430;&#x447;&#x435;&#x43d;".
         if ($order['payment_status'] === 'paid' && $order['payment_method'] === 'installment') {
             $pdo->prepare('UPDATE orders SET payment_status = "unpaid" WHERE id = ?')->execute([$id]);
         }
-        crm_flash_set('Отметка оплаты по платежу снята.');
+        crm_flash_set("\u{41e}\u{442}\u{43c}\u{435}\u{442}\u{43a}\u{430} \u{43e}\u{43f}\u{43b}\u{430}\u{442}\u{44b} \u{43f}\u{43e} \u{43f}\u{43b}\u{430}\u{442}\u{435}\u{436}\u{443} \u{441}\u{43d}\u{44f}\u{442}\u{430}.");
     }
     crm_redirect('/crm/order.php?id=' . $id);
 }
@@ -207,7 +207,7 @@ if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') 
     crm_csrf_check();
     $instId = (int) ($_POST['installment_id'] ?? 0);
     $pdo->prepare("DELETE FROM order_installments WHERE id = ? AND order_id = ? AND status = 'pending'")->execute([$instId, $id]);
-    crm_flash_set('Платёж удалён из графика.');
+    crm_flash_set("\u{41f}\u{43b}\u{430}\u{442}\u{451}\u{436} \u{443}\u{434}\u{430}\u{43b}\u{451}\u{43d} \u{438}\u{437} \u{433}\u{440}\u{430}\u{444}\u{438}\u{43a}\u{430}.");
     crm_redirect('/crm/order.php?id=' . $id);
 }
 
@@ -239,55 +239,55 @@ if ($order && $order['shipment_run_id']) {
 
 $preselectClientId = (int) ($_GET['client_id'] ?? 0);
 
-$pageTitle = $order ? ('Заявка №' . $order['id']) : 'Новая заявка';
+$pageTitle = $order ? ("\u{417}\u{430}\u{44f}\u{432}\u{43a}\u{430} \u{2116}" . $order['id']) : "\u{41d}\u{43e}\u{432}\u{430}\u{44f} \u{437}\u{430}\u{44f}\u{432}\u{43a}\u{430}";
 $activeNav = 'orders';
 require __DIR__ . '/includes/layout_top.php';
 ?>
 
-<p><a href="/crm/orders.php">← Все заявки</a></p>
+<p><a href="/crm/orders.php">&#x2190; &#x412;&#x441;&#x435; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x438;</a></p>
 
 <?php if (!$order): ?>
 
 <div class="card">
-  <h3 style="margin-top:0;">Новая заявка на доставку</h3>
+  <h3 style="margin-top:0;">&#x41d;&#x43e;&#x432;&#x430;&#x44f; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x430; &#x43d;&#x430; &#x434;&#x43e;&#x441;&#x442;&#x430;&#x432;&#x43a;&#x443;</h3>
   <form method="post">
     <?= crm_csrf_field() ?>
     <input type="hidden" name="action" value="create">
-    <label>Клиент</label>
+    <label>&#x41a;&#x43b;&#x438;&#x435;&#x43d;&#x442;</label>
     <select name="client_id" required>
-      <option value="">— выберите клиента —</option>
+      <option value="">&#x2014; &#x432;&#x44b;&#x431;&#x435;&#x440;&#x438;&#x442;&#x435; &#x43a;&#x43b;&#x438;&#x435;&#x43d;&#x442;&#x430; &#x2014;</option>
       <?php foreach ($clients as $c): ?>
         <option value="<?= (int)$c['id'] ?>" <?= $preselectClientId === (int)$c['id'] ? 'selected' : '' ?>><?= e($c['name']) ?> <?= $c['phone'] ? '(' . e($c['phone']) . ')' : '' ?></option>
       <?php endforeach; ?>
     </select>
-    <p class="text-muted" style="margin-top:-10px;">Нет нужного клиента? <a href="/crm/clients.php">Добавьте его здесь</a>, затем вернитесь.</p>
+    <p class="text-muted" style="margin-top:-10px;">&#x41d;&#x435;&#x442; &#x43d;&#x443;&#x436;&#x43d;&#x43e;&#x433;&#x43e; &#x43a;&#x43b;&#x438;&#x435;&#x43d;&#x442;&#x430;? <a href="/crm/clients.php">&#x414;&#x43e;&#x431;&#x430;&#x432;&#x44c;&#x442;&#x435; &#x435;&#x433;&#x43e; &#x437;&#x434;&#x435;&#x441;&#x44c;</a>, &#x437;&#x430;&#x442;&#x435;&#x43c; &#x432;&#x435;&#x440;&#x43d;&#x438;&#x442;&#x435;&#x441;&#x44c;.</p>
 
     <div class="form-row">
-      <div><label>Город отправления</label><input type="text" name="from_city" value="Дербент"></div>
-      <div><label>Город назначения</label><input type="text" name="to_city" value="Санкт-Петербург"></div>
+      <div><label>&#x413;&#x43e;&#x440;&#x43e;&#x434; &#x43e;&#x442;&#x43f;&#x440;&#x430;&#x432;&#x43b;&#x435;&#x43d;&#x438;&#x44f;</label><input type="text" name="from_city" value="&#x414;&#x435;&#x440;&#x431;&#x435;&#x43d;&#x442;"></div>
+      <div><label>&#x413;&#x43e;&#x440;&#x43e;&#x434; &#x43d;&#x430;&#x437;&#x43d;&#x430;&#x447;&#x435;&#x43d;&#x438;&#x44f;</label><input type="text" name="to_city" value="&#x421;&#x430;&#x43d;&#x43a;&#x442;-&#x41f;&#x435;&#x442;&#x435;&#x440;&#x431;&#x443;&#x440;&#x433;"></div>
     </div>
     <div class="form-row">
-      <div><label>Адрес отправления</label><input type="text" name="from_address"></div>
-      <div><label>Адрес получения</label><input type="text" name="to_address"></div>
+      <div><label>&#x410;&#x434;&#x440;&#x435;&#x441; &#x43e;&#x442;&#x43f;&#x440;&#x430;&#x432;&#x43b;&#x435;&#x43d;&#x438;&#x44f;</label><input type="text" name="from_address"></div>
+      <div><label>&#x410;&#x434;&#x440;&#x435;&#x441; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x44f;</label><input type="text" name="to_address"></div>
     </div>
-    <label>Способ получения груза от отправителя</label>
+    <label>&#x421;&#x43f;&#x43e;&#x441;&#x43e;&#x431; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x44f; &#x433;&#x440;&#x443;&#x437;&#x430; &#x43e;&#x442; &#x43e;&#x442;&#x43f;&#x440;&#x430;&#x432;&#x438;&#x442;&#x435;&#x43b;&#x44f;</label>
     <select name="pickup_type">
-      <option value="self">Самостоятельно (клиент привозит сам)</option>
-      <option value="courier">Выездной сбор (курьер забирает по адресу отправления)</option>
+      <option value="self">&#x421;&#x430;&#x43c;&#x43e;&#x441;&#x442;&#x43e;&#x44f;&#x442;&#x435;&#x43b;&#x44c;&#x43d;&#x43e; (&#x43a;&#x43b;&#x438;&#x435;&#x43d;&#x442; &#x43f;&#x440;&#x438;&#x432;&#x43e;&#x437;&#x438;&#x442; &#x441;&#x430;&#x43c;)</option>
+      <option value="courier">&#x412;&#x44b;&#x435;&#x437;&#x434;&#x43d;&#x43e;&#x439; &#x441;&#x431;&#x43e;&#x440; (&#x43a;&#x443;&#x440;&#x44c;&#x435;&#x440; &#x437;&#x430;&#x431;&#x438;&#x440;&#x430;&#x435;&#x442; &#x43f;&#x43e; &#x430;&#x434;&#x440;&#x435;&#x441;&#x443; &#x43e;&#x442;&#x43f;&#x440;&#x430;&#x432;&#x43b;&#x435;&#x43d;&#x438;&#x44f;)</option>
     </select>
-    <label>Описание груза</label>
-    <input type="text" name="cargo_description" placeholder="например: коробка, 2 места">
+    <label>&#x41e;&#x43f;&#x438;&#x441;&#x430;&#x43d;&#x438;&#x435; &#x433;&#x440;&#x443;&#x437;&#x430;</label>
+    <input type="text" name="cargo_description" placeholder="&#x43d;&#x430;&#x43f;&#x440;&#x438;&#x43c;&#x435;&#x440;: &#x43a;&#x43e;&#x440;&#x43e;&#x431;&#x43a;&#x430;, 2 &#x43c;&#x435;&#x441;&#x442;&#x430;">
     <div class="form-row">
-      <div><label>Вес, кг</label><input type="number" step="0.1" name="weight_kg"></div>
-      <div><label>Объявленная ценность, ₽</label><input type="number" step="0.01" name="declared_value"></div>
+      <div><label>&#x412;&#x435;&#x441;, &#x43a;&#x433;</label><input type="number" step="0.1" name="weight_kg"></div>
+      <div><label>&#x41e;&#x431;&#x44a;&#x44f;&#x432;&#x43b;&#x435;&#x43d;&#x43d;&#x430;&#x44f; &#x446;&#x435;&#x43d;&#x43d;&#x43e;&#x441;&#x442;&#x44c;, &#x20bd;</label><input type="number" step="0.01" name="declared_value"></div>
     </div>
     <div class="form-row">
-      <div><label>Стоимость доставки, ₽</label><input type="number" step="0.01" name="price"></div>
-      <div><label>Планируемая дата доставки</label><input type="date" name="planned_date"></div>
+      <div><label>&#x421;&#x442;&#x43e;&#x438;&#x43c;&#x43e;&#x441;&#x442;&#x44c; &#x434;&#x43e;&#x441;&#x442;&#x430;&#x432;&#x43a;&#x438;, &#x20bd;</label><input type="number" step="0.01" name="price"></div>
+      <div><label>&#x41f;&#x43b;&#x430;&#x43d;&#x438;&#x440;&#x443;&#x435;&#x43c;&#x430;&#x44f; &#x434;&#x430;&#x442;&#x430; &#x434;&#x43e;&#x441;&#x442;&#x430;&#x432;&#x43a;&#x438;</label><input type="date" name="planned_date"></div>
     </div>
-    <label>Комментарий</label>
+    <label>&#x41a;&#x43e;&#x43c;&#x43c;&#x435;&#x43d;&#x442;&#x430;&#x440;&#x438;&#x439;</label>
     <textarea name="comment"></textarea>
-    <div class="form-actions"><button class="btn" type="submit">Создать заявку</button></div>
+    <div class="form-actions"><button class="btn" type="submit">&#x421;&#x43e;&#x437;&#x434;&#x430;&#x442;&#x44c; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x443;</button></div>
   </form>
 </div>
 
@@ -298,10 +298,10 @@ require __DIR__ . '/includes/layout_top.php';
     <div>
       <span class="badge <?= crm_order_status_class($order['status']) ?>" style="font-size:.85rem;"><?= e(crm_order_status_label($order['status'])) ?></span>
       <span class="badge <?= crm_payment_status_class($order['payment_status']) ?>" style="font-size:.85rem;">
-        <?= e(crm_payment_status_label($order['payment_status'])) ?><?php if ($order['payment_status'] === 'paid'): ?> — <?= e(crm_payment_method_label($order['payment_method'])) ?><?php endif; ?>
+        <?= e(crm_payment_status_label($order['payment_status'])) ?><?php if ($order['payment_status'] === 'paid'): ?> &#x2014; <?= e(crm_payment_method_label($order['payment_method'])) ?><?php endif; ?>
       </span>
       <?php if ($order['payment_method'] === 'installment' && $installmentTotals['cnt'] > 0): ?>
-        <span class="badge badge-blue" style="font-size:.85rem;">Рассрочка: оплачено <?= crm_money($installmentTotals['paid']) ?> из <?= crm_money($installmentTotals['total']) ?></span>
+        <span class="badge badge-blue" style="font-size:.85rem;">&#x420;&#x430;&#x441;&#x441;&#x440;&#x43e;&#x447;&#x43a;&#x430;: &#x43e;&#x43f;&#x43b;&#x430;&#x447;&#x435;&#x43d;&#x43e; <?= crm_money($installmentTotals['paid']) ?> &#x438;&#x437; <?= crm_money($installmentTotals['total']) ?></span>
       <?php endif; ?>
       <?php if (($order['pickup_type'] ?? 'self') === 'courier'): ?>
         <span class="badge <?= crm_pickup_type_class($order['pickup_type']) ?>" style="font-size:.85rem;"><?= e(crm_pickup_type_label($order['pickup_type'])) ?></span>
@@ -312,59 +312,59 @@ require __DIR__ . '/includes/layout_top.php';
         <form method="post" class="inline">
           <?= crm_csrf_field() ?>
           <input type="hidden" name="action" value="unmark_paid">
-          <button class="btn small secondary" type="submit">Снять отметку оплаты</button>
+          <button class="btn small secondary" type="submit">&#x421;&#x43d;&#x44f;&#x442;&#x44c; &#x43e;&#x442;&#x43c;&#x435;&#x442;&#x43a;&#x443; &#x43e;&#x43f;&#x43b;&#x430;&#x442;&#x44b;</button>
         </form>
       <?php else: ?>
         <form method="post" class="inline" style="display:flex;gap:6px;align-items:center;">
           <?= crm_csrf_field() ?>
           <input type="hidden" name="action" value="mark_paid">
           <select name="payment_method" required>
-            <option value="">— способ оплаты —</option>
-            <option value="cash">Наличный расчёт</option>
-            <option value="terminal">Оплата через терминал</option>
-            <option value="invoice">Оплата по счёту</option>
-            <option value="online">Онлайн на сайте</option>
+            <option value="">&#x2014; &#x441;&#x43f;&#x43e;&#x441;&#x43e;&#x431; &#x43e;&#x43f;&#x43b;&#x430;&#x442;&#x44b; &#x2014;</option>
+            <option value="cash">&#x41d;&#x430;&#x43b;&#x438;&#x447;&#x43d;&#x44b;&#x439; &#x440;&#x430;&#x441;&#x447;&#x451;&#x442;</option>
+            <option value="terminal">&#x41e;&#x43f;&#x43b;&#x430;&#x442;&#x430; &#x447;&#x435;&#x440;&#x435;&#x437; &#x442;&#x435;&#x440;&#x43c;&#x438;&#x43d;&#x430;&#x43b;</option>
+            <option value="invoice">&#x41e;&#x43f;&#x43b;&#x430;&#x442;&#x430; &#x43f;&#x43e; &#x441;&#x447;&#x451;&#x442;&#x443;</option>
+            <option value="online">&#x41e;&#x43d;&#x43b;&#x430;&#x439;&#x43d; &#x43d;&#x430; &#x441;&#x430;&#x439;&#x442;&#x435;</option>
           </select>
-          <button class="btn small secondary" type="submit">Отметить оплаченным</button>
+          <button class="btn small secondary" type="submit">&#x41e;&#x442;&#x43c;&#x435;&#x442;&#x438;&#x442;&#x44c; &#x43e;&#x43f;&#x43b;&#x430;&#x447;&#x435;&#x43d;&#x43d;&#x44b;&#x43c;</button>
         </form>
         <?php if ($order['payment_status'] === 'postpaid'): ?>
           <form method="post" class="inline">
             <?= crm_csrf_field() ?>
             <input type="hidden" name="action" value="unmark_postpaid">
-            <button class="btn small secondary" type="submit">Снять отметку постоплаты</button>
+            <button class="btn small secondary" type="submit">&#x421;&#x43d;&#x44f;&#x442;&#x44c; &#x43e;&#x442;&#x43c;&#x435;&#x442;&#x43a;&#x443; &#x43f;&#x43e;&#x441;&#x442;&#x43e;&#x43f;&#x43b;&#x430;&#x442;&#x44b;</button>
           </form>
         <?php else: ?>
           <form method="post" class="inline">
             <?= crm_csrf_field() ?>
             <input type="hidden" name="action" value="mark_postpaid">
-            <button class="btn small secondary" type="submit">Постоплата (после доставки)</button>
+            <button class="btn small secondary" type="submit">&#x41f;&#x43e;&#x441;&#x442;&#x43e;&#x43f;&#x43b;&#x430;&#x442;&#x430; (&#x43f;&#x43e;&#x441;&#x43b;&#x435; &#x434;&#x43e;&#x441;&#x442;&#x430;&#x432;&#x43a;&#x438;)</button>
           </form>
         <?php endif; ?>
       <?php endif; ?>
-      <a class="btn small" href="/crm/invoice.php?order_id=<?= (int)$order['id'] ?>">Выставить счёт</a>
-      <a class="btn small secondary" href="/crm/waybill.php?id=<?= (int)$order['id'] ?>" target="_blank">Печать накладной</a>
-      <a class="btn small secondary" href="/crm/claim.php?order_id=<?= (int)$order['id'] ?>">+ Претензия</a>
+      <a class="btn small" href="/crm/invoice.php?order_id=<?= (int)$order['id'] ?>">&#x412;&#x44b;&#x441;&#x442;&#x430;&#x432;&#x438;&#x442;&#x44c; &#x441;&#x447;&#x451;&#x442;</a>
+      <a class="btn small secondary" href="/crm/waybill.php?id=<?= (int)$order['id'] ?>" target="_blank">&#x41f;&#x435;&#x447;&#x430;&#x442;&#x44c; &#x43d;&#x430;&#x43a;&#x43b;&#x430;&#x434;&#x43d;&#x43e;&#x439;</a>
+      <a class="btn small secondary" href="/crm/claim.php?order_id=<?= (int)$order['id'] ?>">+ &#x41f;&#x440;&#x435;&#x442;&#x435;&#x43d;&#x437;&#x438;&#x44f;</a>
     </div>
   </div>
 </div>
 
 <div class="card">
-  <h3 style="margin-top:0;">Рассрочка — график платежей</h3>
+  <h3 style="margin-top:0;">&#x420;&#x430;&#x441;&#x441;&#x440;&#x43e;&#x447;&#x43a;&#x430; &#x2014; &#x433;&#x440;&#x430;&#x444;&#x438;&#x43a; &#x43f;&#x43b;&#x430;&#x442;&#x435;&#x436;&#x435;&#x439;</h3>
   <?php if (!$installments): ?>
-    <div class="empty-state">Рассрочка не оформлена.</div>
+    <div class="empty-state">&#x420;&#x430;&#x441;&#x441;&#x440;&#x43e;&#x447;&#x43a;&#x430; &#x43d;&#x435; &#x43e;&#x444;&#x43e;&#x440;&#x43c;&#x43b;&#x435;&#x43d;&#x430;.</div>
   <?php else: ?>
     <table>
-      <thead><tr><th>Дата платежа</th><th>Сумма</th><th>Статус</th><th></th></tr></thead>
+      <thead><tr><th>&#x414;&#x430;&#x442;&#x430; &#x43f;&#x43b;&#x430;&#x442;&#x435;&#x436;&#x430;</th><th>&#x421;&#x443;&#x43c;&#x43c;&#x430;</th><th>&#x421;&#x442;&#x430;&#x442;&#x443;&#x441;</th><th></th></tr></thead>
       <tbody>
         <?php foreach ($installments as $inst): ?>
         <tr>
-          <td><?= $inst['due_date'] ? crm_date($inst['due_date'], 'd.m.Y') : '—' ?></td>
+          <td><?= $inst['due_date'] ? crm_date($inst['due_date'], 'd.m.Y') : "\u{2014}" ?></td>
           <td><?= crm_money((float) $inst['amount']) ?></td>
           <td>
             <?php if ($inst['status'] === 'paid'): ?>
-              <span class="badge badge-green">Оплачен <?= $inst['paid_at'] ? crm_date($inst['paid_at'], 'd.m.Y') : '' ?></span>
+              <span class="badge badge-green">&#x41e;&#x43f;&#x43b;&#x430;&#x447;&#x435;&#x43d; <?= $inst['paid_at'] ? crm_date($inst['paid_at'], 'd.m.Y') : '' ?></span>
             <?php else: ?>
-              <span class="badge badge-grey">Ожидает</span>
+              <span class="badge badge-grey">&#x41e;&#x436;&#x438;&#x434;&#x430;&#x435;&#x442;</span>
             <?php endif; ?>
           </td>
           <td style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -373,20 +373,20 @@ require __DIR__ . '/includes/layout_top.php';
                 <?= crm_csrf_field() ?>
                 <input type="hidden" name="action" value="unmark_installment_paid">
                 <input type="hidden" name="installment_id" value="<?= (int) $inst['id'] ?>">
-                <button class="btn small secondary" type="submit">Снять оплату</button>
+                <button class="btn small secondary" type="submit">&#x421;&#x43d;&#x44f;&#x442;&#x44c; &#x43e;&#x43f;&#x43b;&#x430;&#x442;&#x443;</button>
               </form>
             <?php else: ?>
               <form method="post" class="inline">
                 <?= crm_csrf_field() ?>
                 <input type="hidden" name="action" value="mark_installment_paid">
                 <input type="hidden" name="installment_id" value="<?= (int) $inst['id'] ?>">
-                <button class="btn small secondary" type="submit">Отметить оплаченным</button>
+                <button class="btn small secondary" type="submit">&#x41e;&#x442;&#x43c;&#x435;&#x442;&#x438;&#x442;&#x44c; &#x43e;&#x43f;&#x43b;&#x430;&#x447;&#x435;&#x43d;&#x43d;&#x44b;&#x43c;</button>
               </form>
-              <form method="post" class="inline" onsubmit="return confirm('Удалить платёж из графика?');">
+              <form method="post" class="inline" onsubmit="return confirm("\u{423}\u{434}\u{430}\u{43b}\u{438}\u{442}\u{44c} \u{43f}\u{43b}\u{430}\u{442}\u{451}\u{436} \u{438}\u{437} \u{433}\u{440}\u{430}\u{444}\u{438}\u{43a}\u{430}?");">
                 <?= crm_csrf_field() ?>
                 <input type="hidden" name="action" value="delete_installment">
                 <input type="hidden" name="installment_id" value="<?= (int) $inst['id'] ?>">
-                <button class="btn small danger" type="submit">Удалить</button>
+                <button class="btn small danger" type="submit">&#x423;&#x434;&#x430;&#x43b;&#x438;&#x442;&#x44c;</button>
               </form>
             <?php endif; ?>
           </td>
@@ -395,23 +395,23 @@ require __DIR__ . '/includes/layout_top.php';
       </tbody>
     </table>
     <p class="text-muted" style="margin-top:10px;">
-      Оплачено <?= crm_money($installmentTotals['paid']) ?> из <?= crm_money($installmentTotals['total']) ?>
-      (осталось <?= crm_money($installmentTotals['remaining']) ?>). Когда оплачены все платежи графика —
-      заявка автоматически отмечается «Оплачен».
+      &#x41e;&#x43f;&#x43b;&#x430;&#x447;&#x435;&#x43d;&#x43e; <?= crm_money($installmentTotals['paid']) ?> &#x438;&#x437; <?= crm_money($installmentTotals['total']) ?>
+      (&#x43e;&#x441;&#x442;&#x430;&#x43b;&#x43e;&#x441;&#x44c; <?= crm_money($installmentTotals['remaining']) ?>). &#x41a;&#x43e;&#x433;&#x434;&#x430; &#x43e;&#x43f;&#x43b;&#x430;&#x447;&#x435;&#x43d;&#x44b; &#x432;&#x441;&#x435; &#x43f;&#x43b;&#x430;&#x442;&#x435;&#x436;&#x438; &#x433;&#x440;&#x430;&#x444;&#x438;&#x43a;&#x430; &#x2014;
+      &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x430; &#x430;&#x432;&#x442;&#x43e;&#x43c;&#x430;&#x442;&#x438;&#x447;&#x435;&#x441;&#x43a;&#x438; &#x43e;&#x442;&#x43c;&#x435;&#x447;&#x430;&#x435;&#x442;&#x441;&#x44f; &#xab;&#x41e;&#x43f;&#x43b;&#x430;&#x447;&#x435;&#x43d;&#xbb;.
     </p>
   <?php endif; ?>
 
   <form method="post" class="form-row" style="align-items:end;margin-top:12px;">
     <?= crm_csrf_field() ?>
     <input type="hidden" name="action" value="add_installment">
-    <div><label>Дата платежа</label><input type="date" name="due_date"></div>
-    <div><label>Сумма, ₽</label><input type="number" step="0.01" name="amount" required></div>
-    <div class="form-actions"><button class="btn secondary" type="submit">Добавить платёж в график</button></div>
+    <div><label>&#x414;&#x430;&#x442;&#x430; &#x43f;&#x43b;&#x430;&#x442;&#x435;&#x436;&#x430;</label><input type="date" name="due_date"></div>
+    <div><label>&#x421;&#x443;&#x43c;&#x43c;&#x430;, &#x20bd;</label><input type="number" step="0.01" name="amount" required></div>
+    <div class="form-actions"><button class="btn secondary" type="submit">&#x414;&#x43e;&#x431;&#x430;&#x432;&#x438;&#x442;&#x44c; &#x43f;&#x43b;&#x430;&#x442;&#x451;&#x436; &#x432; &#x433;&#x440;&#x430;&#x444;&#x438;&#x43a;</button></div>
   </form>
 </div>
 
 <div class="card">
-  <h3 style="margin-top:0;">Клиент: <a href="/crm/client.php?id=<?= (int)$order['client_id'] ?>"><?php
+  <h3 style="margin-top:0;">&#x41a;&#x43b;&#x438;&#x435;&#x43d;&#x442;: <a href="/crm/client.php?id=<?= (int)$order['client_id'] ?>"><?php
     $cl = $pdo->prepare('SELECT name FROM clients WHERE id = ?'); $cl->execute([$order['client_id']]);
     echo e($cl->fetchColumn());
   ?></a></h3>
@@ -420,84 +420,84 @@ require __DIR__ . '/includes/layout_top.php';
     <?= crm_csrf_field() ?>
     <input type="hidden" name="action" value="update">
     <div class="form-row">
-      <div><label>Город отправления</label><input type="text" name="from_city" value="<?= e($order['from_city']) ?>"></div>
-      <div><label>Город назначения</label><input type="text" name="to_city" value="<?= e($order['to_city']) ?>"></div>
+      <div><label>&#x413;&#x43e;&#x440;&#x43e;&#x434; &#x43e;&#x442;&#x43f;&#x440;&#x430;&#x432;&#x43b;&#x435;&#x43d;&#x438;&#x44f;</label><input type="text" name="from_city" value="<?= e($order['from_city']) ?>"></div>
+      <div><label>&#x413;&#x43e;&#x440;&#x43e;&#x434; &#x43d;&#x430;&#x437;&#x43d;&#x430;&#x447;&#x435;&#x43d;&#x438;&#x44f;</label><input type="text" name="to_city" value="<?= e($order['to_city']) ?>"></div>
     </div>
     <div class="form-row">
-      <div><label>Адрес отправления</label><input type="text" name="from_address" value="<?= e($order['from_address']) ?>"></div>
-      <div><label>Адрес получения</label><input type="text" name="to_address" value="<?= e($order['to_address']) ?>"></div>
+      <div><label>&#x410;&#x434;&#x440;&#x435;&#x441; &#x43e;&#x442;&#x43f;&#x440;&#x430;&#x432;&#x43b;&#x435;&#x43d;&#x438;&#x44f;</label><input type="text" name="from_address" value="<?= e($order['from_address']) ?>"></div>
+      <div><label>&#x410;&#x434;&#x440;&#x435;&#x441; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x44f;</label><input type="text" name="to_address" value="<?= e($order['to_address']) ?>"></div>
     </div>
-    <label>Способ получения груза от отправителя</label>
+    <label>&#x421;&#x43f;&#x43e;&#x441;&#x43e;&#x431; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x44f; &#x433;&#x440;&#x443;&#x437;&#x430; &#x43e;&#x442; &#x43e;&#x442;&#x43f;&#x440;&#x430;&#x432;&#x438;&#x442;&#x435;&#x43b;&#x44f;</label>
     <select name="pickup_type">
-      <option value="self" <?= ($order['pickup_type'] ?? 'self') === 'self' ? 'selected' : '' ?>>Самостоятельно (клиент привозит сам)</option>
-      <option value="courier" <?= ($order['pickup_type'] ?? 'self') === 'courier' ? 'selected' : '' ?>>Выездной сбор (курьер забирает по адресу отправления)</option>
+      <option value="self" <?= ($order['pickup_type'] ?? 'self') === 'self' ? 'selected' : '' ?>>&#x421;&#x430;&#x43c;&#x43e;&#x441;&#x442;&#x43e;&#x44f;&#x442;&#x435;&#x43b;&#x44c;&#x43d;&#x43e; (&#x43a;&#x43b;&#x438;&#x435;&#x43d;&#x442; &#x43f;&#x440;&#x438;&#x432;&#x43e;&#x437;&#x438;&#x442; &#x441;&#x430;&#x43c;)</option>
+      <option value="courier" <?= ($order['pickup_type'] ?? 'self') === 'courier' ? 'selected' : '' ?>>&#x412;&#x44b;&#x435;&#x437;&#x434;&#x43d;&#x43e;&#x439; &#x441;&#x431;&#x43e;&#x440; (&#x43a;&#x443;&#x440;&#x44c;&#x435;&#x440; &#x437;&#x430;&#x431;&#x438;&#x440;&#x430;&#x435;&#x442; &#x43f;&#x43e; &#x430;&#x434;&#x440;&#x435;&#x441;&#x443; &#x43e;&#x442;&#x43f;&#x440;&#x430;&#x432;&#x43b;&#x435;&#x43d;&#x438;&#x44f;)</option>
     </select>
-    <label>Описание груза</label>
+    <label>&#x41e;&#x43f;&#x438;&#x441;&#x430;&#x43d;&#x438;&#x435; &#x433;&#x440;&#x443;&#x437;&#x430;</label>
     <input type="text" name="cargo_description" value="<?= e($order['cargo_description']) ?>">
     <div class="form-row">
-      <div><label>Вес, кг</label><input type="number" step="0.1" name="weight_kg" value="<?= e($order['weight_kg']) ?>"></div>
-      <div><label>Объявленная ценность, ₽</label><input type="number" step="0.01" name="declared_value" value="<?= e($order['declared_value']) ?>"></div>
+      <div><label>&#x412;&#x435;&#x441;, &#x43a;&#x433;</label><input type="number" step="0.1" name="weight_kg" value="<?= e($order['weight_kg']) ?>"></div>
+      <div><label>&#x41e;&#x431;&#x44a;&#x44f;&#x432;&#x43b;&#x435;&#x43d;&#x43d;&#x430;&#x44f; &#x446;&#x435;&#x43d;&#x43d;&#x43e;&#x441;&#x442;&#x44c;, &#x20bd;</label><input type="number" step="0.01" name="declared_value" value="<?= e($order['declared_value']) ?>"></div>
     </div>
     <div class="form-row">
-      <div><label>Стоимость доставки, ₽</label><input type="number" step="0.01" name="price" value="<?= e($order['price']) ?>"></div>
-      <div><label>Планируемая дата доставки</label><input type="date" name="planned_date" value="<?= e($order['planned_date']) ?>"></div>
+      <div><label>&#x421;&#x442;&#x43e;&#x438;&#x43c;&#x43e;&#x441;&#x442;&#x44c; &#x434;&#x43e;&#x441;&#x442;&#x430;&#x432;&#x43a;&#x438;, &#x20bd;</label><input type="number" step="0.01" name="price" value="<?= e($order['price']) ?>"></div>
+      <div><label>&#x41f;&#x43b;&#x430;&#x43d;&#x438;&#x440;&#x443;&#x435;&#x43c;&#x430;&#x44f; &#x434;&#x430;&#x442;&#x430; &#x434;&#x43e;&#x441;&#x442;&#x430;&#x432;&#x43a;&#x438;</label><input type="date" name="planned_date" value="<?= e($order['planned_date']) ?>"></div>
     </div>
-    <label>Комментарий</label>
+    <label>&#x41a;&#x43e;&#x43c;&#x43c;&#x435;&#x43d;&#x442;&#x430;&#x440;&#x438;&#x439;</label>
     <textarea name="comment"><?= e($order['comment']) ?></textarea>
-    <div class="form-actions"><button class="btn" type="submit">Сохранить изменения</button></div>
+    <div class="form-actions"><button class="btn" type="submit">&#x421;&#x43e;&#x445;&#x440;&#x430;&#x43d;&#x438;&#x442;&#x44c; &#x438;&#x437;&#x43c;&#x435;&#x43d;&#x435;&#x43d;&#x438;&#x44f;</button></div>
   </form>
 </div>
 
 <div class="card">
-  <h3 style="margin-top:0;">Курьер и маршрут</h3>
+  <h3 style="margin-top:0;">&#x41a;&#x443;&#x440;&#x44c;&#x435;&#x440; &#x438; &#x43c;&#x430;&#x440;&#x448;&#x440;&#x443;&#x442;</h3>
   <form method="post" class="form-row" style="align-items:end;">
     <?= crm_csrf_field() ?>
     <input type="hidden" name="action" value="assign_courier">
     <div>
-      <label>Назначенный курьер</label>
+      <label>&#x41d;&#x430;&#x437;&#x43d;&#x430;&#x447;&#x435;&#x43d;&#x43d;&#x44b;&#x439; &#x43a;&#x443;&#x440;&#x44c;&#x435;&#x440;</label>
       <select name="courier_id">
-        <option value="">— не назначен —</option>
+        <option value="">&#x2014; &#x43d;&#x435; &#x43d;&#x430;&#x437;&#x43d;&#x430;&#x447;&#x435;&#x43d; &#x2014;</option>
         <?php foreach ($couriers as $c): ?>
           <option value="<?= (int)$c['id'] ?>" <?= (int)$order['courier_id'] === (int)$c['id'] ? 'selected' : '' ?>><?= e($c['name']) ?></option>
         <?php endforeach; ?>
       </select>
     </div>
-    <div class="form-actions"><button class="btn secondary" type="submit">Назначить</button></div>
+    <div class="form-actions"><button class="btn secondary" type="submit">&#x41d;&#x430;&#x437;&#x43d;&#x430;&#x447;&#x438;&#x442;&#x44c;</button></div>
   </form>
 </div>
 
 <div class="card">
-  <h3 style="margin-top:0;">Сборный рейс</h3>
+  <h3 style="margin-top:0;">&#x421;&#x431;&#x43e;&#x440;&#x43d;&#x44b;&#x439; &#x440;&#x435;&#x439;&#x441;</h3>
   <?php if ($currentRun): ?>
-    <p>Заявка включена в рейс <a href="/crm/shipments.php?id=<?= (int) $currentRun['id'] ?>">№<?= (int) $currentRun['id'] ?> — <?= e($currentRun['from_city']) ?> → <?= e($currentRun['to_city']) ?><?= $currentRun['run_date'] ? ', ' . e(crm_date($currentRun['run_date'], 'd.m.Y')) : '' ?></a>
+    <p>&#x417;&#x430;&#x44f;&#x432;&#x43a;&#x430; &#x432;&#x43a;&#x43b;&#x44e;&#x447;&#x435;&#x43d;&#x430; &#x432; &#x440;&#x435;&#x439;&#x441; <a href="/crm/shipments.php?id=<?= (int) $currentRun['id'] ?>">&#x2116;<?= (int) $currentRun['id'] ?> &#x2014; <?= e($currentRun['from_city']) ?> &#x2192; <?= e($currentRun['to_city']) ?><?= $currentRun['run_date'] ? ', ' . e(crm_date($currentRun['run_date'], 'd.m.Y')) : '' ?></a>
     <span class="badge <?= crm_shipment_run_status_class($currentRun['status']) ?>"><?= e(crm_shipment_run_status_label($currentRun['status'])) ?></span></p>
   <?php else: ?>
-    <div class="empty-state">Заявка пока не включена ни в один сборный рейс.</div>
+    <div class="empty-state">&#x417;&#x430;&#x44f;&#x432;&#x43a;&#x430; &#x43f;&#x43e;&#x43a;&#x430; &#x43d;&#x435; &#x432;&#x43a;&#x43b;&#x44e;&#x447;&#x435;&#x43d;&#x430; &#x43d;&#x438; &#x432; &#x43e;&#x434;&#x438;&#x43d; &#x441;&#x431;&#x43e;&#x440;&#x43d;&#x44b;&#x439; &#x440;&#x435;&#x439;&#x441;.</div>
   <?php endif; ?>
   <form method="post" class="form-row" style="align-items:end;">
     <?= crm_csrf_field() ?>
     <input type="hidden" name="action" value="assign_shipment_run">
     <div>
-      <label>Назначить в рейс</label>
+      <label>&#x41d;&#x430;&#x437;&#x43d;&#x430;&#x447;&#x438;&#x442;&#x44c; &#x432; &#x440;&#x435;&#x439;&#x441;</label>
       <select name="shipment_run_id">
-        <option value="">— не включена —</option>
+        <option value="">&#x2014; &#x43d;&#x435; &#x432;&#x43a;&#x43b;&#x44e;&#x447;&#x435;&#x43d;&#x430; &#x2014;</option>
         <?php foreach ($formingRuns as $r): ?>
-          <option value="<?= (int)$r['id'] ?>" <?= $currentRun && (int)$currentRun['id'] === (int)$r['id'] ? 'selected' : '' ?>>№<?= (int)$r['id'] ?> — <?= e($r['from_city']) ?> → <?= e($r['to_city']) ?><?= $r['run_date'] ? ', ' . e(crm_date($r['run_date'], 'd.m.Y')) : '' ?></option>
+          <option value="<?= (int)$r['id'] ?>" <?= $currentRun && (int)$currentRun['id'] === (int)$r['id'] ? 'selected' : '' ?>>&#x2116;<?= (int)$r['id'] ?> &#x2014; <?= e($r['from_city']) ?> &#x2192; <?= e($r['to_city']) ?><?= $r['run_date'] ? ', ' . e(crm_date($r['run_date'], 'd.m.Y')) : '' ?></option>
         <?php endforeach; ?>
       </select>
     </div>
-    <div class="form-actions"><button class="btn secondary" type="submit">Сохранить</button></div>
+    <div class="form-actions"><button class="btn secondary" type="submit">&#x421;&#x43e;&#x445;&#x440;&#x430;&#x43d;&#x438;&#x442;&#x44c;</button></div>
   </form>
-  <p class="text-muted" style="margin-top:10px;margin-bottom:0;">Новый рейс можно создать на странице <a href="/crm/shipments.php">«Рейсы»</a>.</p>
+  <p class="text-muted" style="margin-top:10px;margin-bottom:0;">&#x41d;&#x43e;&#x432;&#x44b;&#x439; &#x440;&#x435;&#x439;&#x441; &#x43c;&#x43e;&#x436;&#x43d;&#x43e; &#x441;&#x43e;&#x437;&#x434;&#x430;&#x442;&#x44c; &#x43d;&#x430; &#x441;&#x442;&#x440;&#x430;&#x43d;&#x438;&#x446;&#x435; <a href="/crm/shipments.php">&#xab;&#x420;&#x435;&#x439;&#x441;&#x44b;&#xbb;</a>.</p>
 </div>
 
 <div class="card">
-  <h3 style="margin-top:0;">Изменить статус</h3>
+  <h3 style="margin-top:0;">&#x418;&#x437;&#x43c;&#x435;&#x43d;&#x438;&#x442;&#x44c; &#x441;&#x442;&#x430;&#x442;&#x443;&#x441;</h3>
   <form method="post" class="form-row" style="align-items:end;">
     <?= crm_csrf_field() ?>
     <input type="hidden" name="action" value="change_status">
     <div>
-      <label>Новый статус</label>
+      <label>&#x41d;&#x43e;&#x432;&#x44b;&#x439; &#x441;&#x442;&#x430;&#x442;&#x443;&#x441;</label>
       <select name="status">
         <?php foreach (['new','accepted','collecting','in_transit','delivered','cancelled'] as $s): ?>
           <option value="<?= $s ?>" <?= $order['status'] === $s ? 'selected' : '' ?>><?= e(crm_order_status_label($s)) ?></option>
@@ -505,21 +505,21 @@ require __DIR__ . '/includes/layout_top.php';
       </select>
     </div>
     <div>
-      <label>Комментарий (необязательно)</label>
+      <label>&#x41a;&#x43e;&#x43c;&#x43c;&#x435;&#x43d;&#x442;&#x430;&#x440;&#x438;&#x439; (&#x43d;&#x435;&#x43e;&#x431;&#x44f;&#x437;&#x430;&#x442;&#x435;&#x43b;&#x44c;&#x43d;&#x43e;)</label>
       <input type="text" name="status_comment">
     </div>
-    <div class="form-actions"><button class="btn secondary" type="submit">Обновить статус</button></div>
+    <div class="form-actions"><button class="btn secondary" type="submit">&#x41e;&#x431;&#x43d;&#x43e;&#x432;&#x438;&#x442;&#x44c; &#x441;&#x442;&#x430;&#x442;&#x443;&#x441;</button></div>
   </form>
 
   <?php if ($history): ?>
   <table style="margin-top:10px;">
-    <thead><tr><th>Дата</th><th>Статус</th><th>Кто изменил</th><th>Комментарий</th></tr></thead>
+    <thead><tr><th>&#x414;&#x430;&#x442;&#x430;</th><th>&#x421;&#x442;&#x430;&#x442;&#x443;&#x441;</th><th>&#x41a;&#x442;&#x43e; &#x438;&#x437;&#x43c;&#x435;&#x43d;&#x438;&#x43b;</th><th>&#x41a;&#x43e;&#x43c;&#x43c;&#x435;&#x43d;&#x442;&#x430;&#x440;&#x438;&#x439;</th></tr></thead>
     <tbody>
       <?php foreach ($history as $h): ?>
       <tr>
         <td><?= crm_date($h['changed_at']) ?></td>
         <td><span class="badge <?= crm_order_status_class($h['status']) ?>"><?= e(crm_order_status_label($h['status'])) ?></span></td>
-        <td><?= e($h['user_name'] ?? '—') ?></td>
+        <td><?= e($h['user_name'] ?? "\u{2014}") ?></td>
         <td><?= e($h['comment']) ?></td>
       </tr>
       <?php endforeach; ?>
@@ -530,22 +530,22 @@ require __DIR__ . '/includes/layout_top.php';
 
 <div class="card">
   <h3 style="margin-top:0;">
-    Претензии по заявке
-    <a class="btn small" style="float:right;" href="/crm/claim.php?order_id=<?= (int) $order['id'] ?>">+ Новая претензия</a>
+    &#x41f;&#x440;&#x435;&#x442;&#x435;&#x43d;&#x437;&#x438;&#x438; &#x43f;&#x43e; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x435;
+    <a class="btn small" style="float:right;" href="/crm/claim.php?order_id=<?= (int) $order['id'] ?>">+ &#x41d;&#x43e;&#x432;&#x430;&#x44f; &#x43f;&#x440;&#x435;&#x442;&#x435;&#x43d;&#x437;&#x438;&#x44f;</a>
   </h3>
   <?php if (!$orderClaims): ?>
-    <div class="empty-state">Претензий по этой заявке нет.</div>
+    <div class="empty-state">&#x41f;&#x440;&#x435;&#x442;&#x435;&#x43d;&#x437;&#x438;&#x439; &#x43f;&#x43e; &#x44d;&#x442;&#x43e;&#x439; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x435; &#x43d;&#x435;&#x442;.</div>
   <?php else: ?>
   <table>
-    <thead><tr><th>№</th><th>Причина</th><th>Статус</th><th>Компенсация</th><th>Срок ответа</th><th>Создана</th></tr></thead>
+    <thead><tr><th>&#x2116;</th><th>&#x41f;&#x440;&#x438;&#x447;&#x438;&#x43d;&#x430;</th><th>&#x421;&#x442;&#x430;&#x442;&#x443;&#x441;</th><th>&#x41a;&#x43e;&#x43c;&#x43f;&#x435;&#x43d;&#x441;&#x430;&#x446;&#x438;&#x44f;</th><th>&#x421;&#x440;&#x43e;&#x43a; &#x43e;&#x442;&#x432;&#x435;&#x442;&#x430;</th><th>&#x421;&#x43e;&#x437;&#x434;&#x430;&#x43d;&#x430;</th></tr></thead>
     <tbody>
       <?php foreach ($orderClaims as $cl): ?>
       <tr>
-        <td><a href="/crm/claim.php?id=<?= (int) $cl['id'] ?>">№<?= (int) $cl['id'] ?></a></td>
+        <td><a href="/crm/claim.php?id=<?= (int) $cl['id'] ?>">&#x2116;<?= (int) $cl['id'] ?></a></td>
         <td><?= e(crm_claim_reason_label($cl['reason'])) ?></td>
         <td><span class="badge <?= crm_claim_status_class($cl['status']) ?>"><?= e(crm_claim_status_label($cl['status'])) ?></span></td>
         <td><?= crm_money($cl['compensation_amount'] !== null ? (float) $cl['compensation_amount'] : null) ?></td>
-        <td><?= $cl['response_due_date'] ? crm_date($cl['response_due_date'], 'd.m.Y') : '—' ?></td>
+        <td><?= $cl['response_due_date'] ? crm_date($cl['response_due_date'], 'd.m.Y') : "\u{2014}" ?></td>
         <td><?= crm_date($cl['created_at'], 'd.m.Y') ?></td>
       </tr>
       <?php endforeach; ?>
