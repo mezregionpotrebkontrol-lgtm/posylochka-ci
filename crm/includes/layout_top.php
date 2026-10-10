@@ -23,6 +23,7 @@ $companyName = crm_config()['company_name'] ?? "\u{41f}\u{43e}\u{441}\u{44b}\u{4
     <nav>
       <?php if (in_array($user['role'], ['admin','operator'], true)): ?>
         <a href="/crm/index.php" class="<?= ($activeNav ?? '') === 'dashboard' ? 'active' : '' ?>">&#x413;&#x43b;&#x430;&#x432;&#x43d;&#x430;&#x44f;</a>
+        <a href="/crm/reception.php" class="<?= ($activeNav ?? '') === 'reception' ? 'active' : '' ?>">&#x41f;&#x440;&#x438;&#x451;&#x43c;/&#x432;&#x44b;&#x434;&#x430;&#x447;&#x430;</a>
         <a href="/crm/orders.php" class="<?= ($activeNav ?? '') === 'orders' ? 'active' : '' ?>">&#x417;&#x430;&#x44f;&#x432;&#x43a;&#x438;</a>
         <a href="/crm/shipments.php" class="<?= ($activeNav ?? '') === 'shipments' ? 'active' : '' ?>">&#x420;&#x435;&#x439;&#x441;&#x44b;</a>
         <a href="/crm/clients.php" class="<?= ($activeNav ?? '') === 'clients' ? 'active' : '' ?>">&#x41a;&#x43b;&#x438;&#x435;&#x43d;&#x442;&#x44b;</a>
