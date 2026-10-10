@@ -29,6 +29,7 @@ $companyName = crm_config()['company_name'] ?? 'Посылочка';
         <a href="/crm/warehouse.php" class="<?= ($activeNav ?? '') === 'warehouse' ? 'active' : '' ?>">Склад</a>
         <a href="/crm/leads.php" class="<?= ($activeNav ?? '') === 'leads' ? 'active' : '' ?>">Заявки с сайта</a>
         <a href="/crm/reviews.php" class="<?= ($activeNav ?? '') === 'reviews' ? 'active' : '' ?>">Отзывы</a>
+        <a href="/crm/claims.php" class="<?= ($activeNav ?? '') === 'claims' ? 'active' : '' ?>">Претензии</a>
         <a href="/crm/reports.php" class="<?= ($activeNav ?? '') === 'reports' ? 'active' : '' ?>">Отчёты</a>
       <?php endif; ?>
       <?php if ($user['role'] === 'admin'): ?>

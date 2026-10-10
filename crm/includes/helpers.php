@@ -84,6 +84,44 @@ function crm_order_installments_totals(PDO $pdo, int $orderId): array
     ];
 }
 
+function crm_client_type_label(?string $type): string
+{
+    return [
+        'individual' => 'Физическое лицо',
+        'company'    => 'Юридическое лицо',
+    ][$type] ?? 'Физическое лицо';
+}
+
+function crm_claim_reason_label(string $reason): string
+{
+    return [
+        'defect' => 'Брак / повреждение груза',
+        'loss'   => 'Утеря груза',
+        'return' => 'Возврат',
+        'other'  => 'Другое',
+    ][$reason] ?? $reason;
+}
+
+function crm_claim_status_label(string $status): string
+{
+    return [
+        'open'        => 'Открыта',
+        'in_progress' => 'В работе',
+        'resolved'    => 'Решена',
+        'rejected'    => 'Отказано',
+    ][$status] ?? $status;
+}
+
+function crm_claim_status_class(string $status): string
+{
+    return [
+        'open'        => 'badge-grey',
+        'in_progress' => 'badge-orange',
+        'resolved'    => 'badge-green',
+        'rejected'    => 'badge-red',
+    ][$status] ?? 'badge-grey';
+}
+
 function crm_invoice_status_label(string $status): string
 {
     return [

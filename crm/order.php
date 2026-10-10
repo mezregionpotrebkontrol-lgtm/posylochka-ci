@@ -200,6 +200,7 @@ if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') 
 $history = [];
 $installments = [];
 $installmentTotals = ['total' => 0, 'paid' => 0, 'remaining' => 0, 'cnt' => 0, 'paid_cnt' => 0];
+$orderClaims = [];
 if ($order) {
     $h = $pdo->prepare('SELECT h.*, u.name AS user_name FROM order_status_history h LEFT JOIN users u ON u.id = h.changed_by WHERE order_id = ? ORDER BY changed_at DESC');
     $h->execute([$id]);
@@ -209,6 +210,10 @@ if ($order) {
     $instStmt->execute([$id]);
     $installments = $instStmt->fetchAll();
     $installmentTotals = crm_order_installments_totals($pdo, $id);
+
+    $claimsStmt = $pdo->prepare('SELECT * FROM claims WHERE order_id = ? ORDER BY created_at DESC');
+    $claimsStmt->execute([$id]);
+    $orderClaims = $claimsStmt->fetchAll();
 }
 
 $preselectClientId = (int) ($_GET['client_id'] ?? 0);
@@ -309,6 +314,7 @@ require __DIR__ . '/includes/layout_top.php';
       <?php endif; ?>
       <a class="btn small" href="/crm/invoice.php?order_id=<?= (int)$order['id'] ?>">Выставить счёт</a>
       <a class="btn small secondary" href="/crm/waybill.php?id=<?= (int)$order['id'] ?>" target="_blank">Печать накладной</a>
+      <a class="btn small secondary" href="/crm/claim.php?order_id=<?= (int)$order['id'] ?>">+ Претензия</a>
     </div>
   </div>
 </div>
@@ -456,6 +462,32 @@ require __DIR__ . '/includes/layout_top.php';
         <td><span class="badge <?= crm_order_status_class($h['status']) ?>"><?= e(crm_order_status_label($h['status'])) ?></span></td>
         <td><?= e($h['user_name'] ?? '—') ?></td>
         <td><?= e($h['comment']) ?></td>
+      </tr>
+      <?php endforeach; ?>
+    </tbody>
+  </table>
+  <?php endif; ?>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0;">
+    Претензии по заявке
+    <a class="btn small" style="float:right;" href="/crm/claim.php?order_id=<?= (int) $order['id'] ?>">+ Новая претензия</a>
+  </h3>
+  <?php if (!$orderClaims): ?>
+    <div class="empty-state">Претензий по этой заявке нет.</div>
+  <?php else: ?>
+  <table>
+    <thead><tr><th>№</th><th>Причина</th><th>Статус</th><th>Компенсация</th><th>Срок ответа</th><th>Создана</th></tr></thead>
+    <tbody>
+      <?php foreach ($orderClaims as $cl): ?>
+      <tr>
+        <td><a href="/crm/claim.php?id=<?= (int) $cl['id'] ?>">№<?= (int) $cl['id'] ?></a></td>
+        <td><?= e(crm_claim_reason_label($cl['reason'])) ?></td>
+        <td><span class="badge <?= crm_claim_status_class($cl['status']) ?>"><?= e(crm_claim_status_label($cl['status'])) ?></span></td>
+        <td><?= crm_money($cl['compensation_amount'] !== null ? (float) $cl['compensation_amount'] : null) ?></td>
+        <td><?= $cl['response_due_date'] ? crm_date($cl['response_due_date'], 'd.m.Y') : '—' ?></td>
+        <td><?= crm_date($cl['created_at'], 'd.m.Y') ?></td>
       </tr>
       <?php endforeach; ?>
     </tbody>

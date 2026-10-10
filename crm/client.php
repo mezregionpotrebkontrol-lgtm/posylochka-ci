@@ -15,16 +15,27 @@ if (!$client) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update') {
     crm_csrf_check();
     $name = trim($_POST['name'] ?? '');
+    $clientType = in_array($_POST['client_type'] ?? '', ['individual', 'company'], true) ? $_POST['client_type'] : 'individual';
     $phone = trim($_POST['phone'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $address = trim($_POST['address'] ?? '');
+    $inn = trim($_POST['inn'] ?? '');
+    $kpp = trim($_POST['kpp'] ?? '');
+    $contactPerson = trim($_POST['contact_person'] ?? '');
     $notes = trim($_POST['notes'] ?? '');
 
     if ($name === '') {
         crm_flash_set('Укажите имя или название клиента.', 'err');
     } else {
-        $stmt = $pdo->prepare('UPDATE clients SET name=?, phone=?, email=?, address=?, notes=? WHERE id=?');
-        $stmt->execute([$name, $phone ?: null, $email ?: null, $address ?: null, $notes ?: null, $id]);
+        $stmt = $pdo->prepare('UPDATE clients SET name=?, client_type=?, phone=?, email=?, address=?, inn=?, kpp=?, contact_person=?, notes=? WHERE id=?');
+        $stmt->execute([
+            $name, $clientType,
+            $phone ?: null, $email ?: null, $address ?: null,
+            $clientType === 'company' ? ($inn ?: null) : null,
+            $clientType === 'company' ? ($kpp ?: null) : null,
+            $clientType === 'company' ? ($contactPerson ?: null) : null,
+            $notes ?: null, $id,
+        ]);
         crm_flash_set('Данные клиента обновлены.');
         crm_redirect('/crm/client.php?id=' . $id);
     }
@@ -33,6 +44,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
 $ordersStmt = $pdo->prepare('SELECT * FROM orders WHERE client_id = ? ORDER BY created_at DESC');
 $ordersStmt->execute([$id]);
 $orders = $ordersStmt->fetchAll();
+
+$claimsStmt = $pdo->prepare('SELECT cl.*, o.from_city, o.to_city FROM claims cl JOIN orders o ON o.id = cl.order_id WHERE o.client_id = ? ORDER BY cl.created_at DESC');
+$claimsStmt->execute([$id]);
+$clientClaims = $claimsStmt->fetchAll();
 
 // Данные личного кабинета клиента на сайте (регистрация): email, паспорт,
 // адрес регистрации — заполняются самим клиентом при регистрации/заказе
@@ -49,17 +64,35 @@ require __DIR__ . '/includes/layout_top.php';
 <p><a href="/crm/clients.php">← Все клиенты</a></p>
 
 <div class="card">
-  <h3 style="margin-top:0;">Данные клиента</h3>
+  <h3 style="margin-top:0;">Данные клиента
+    <span class="badge <?= ($client['client_type'] ?? 'individual') === 'company' ? 'badge-blue' : 'badge-grey' ?>" style="font-size:.8rem;"><?= e(crm_client_type_label($client['client_type'] ?? 'individual')) ?></span>
+  </h3>
   <form method="post">
     <?= crm_csrf_field() ?>
     <input type="hidden" name="action" value="update">
     <div class="form-row">
+      <div>
+        <label>Тип клиента</label>
+        <select name="client_type" onchange="document.getElementById('clientCompanyFields').style.display = this.value === 'company' ? '' : 'none';">
+          <option value="individual" <?= ($client['client_type'] ?? 'individual') === 'individual' ? 'selected' : '' ?>>Физическое лицо</option>
+          <option value="company" <?= ($client['client_type'] ?? 'individual') === 'company' ? 'selected' : '' ?>>Юридическое лицо</option>
+        </select>
+      </div>
       <div><label>Имя / название</label><input type="text" name="name" required value="<?= e($client['name']) ?>"></div>
-      <div><label>Телефон</label><input type="tel" name="phone" value="<?= e($client['phone']) ?>"></div>
     </div>
     <div class="form-row">
+      <div><label>Телефон</label><input type="tel" name="phone" value="<?= e($client['phone']) ?>"></div>
       <div><label>Email</label><input type="email" name="email" value="<?= e($client['email']) ?>"></div>
-      <div><label>Адрес</label><input type="text" name="address" value="<?= e($client['address']) ?>"></div>
+    </div>
+    <label>Адрес</label>
+    <input type="text" name="address" value="<?= e($client['address']) ?>">
+    <div id="clientCompanyFields" style="<?= ($client['client_type'] ?? 'individual') === 'company' ? '' : 'display:none;' ?>">
+      <div class="form-row">
+        <div><label>ИНН</label><input type="text" name="inn" value="<?= e($client['inn'] ?? '') ?>"></div>
+        <div><label>КПП</label><input type="text" name="kpp" value="<?= e($client['kpp'] ?? '') ?>"></div>
+      </div>
+      <label>Контактное лицо</label>
+      <input type="text" name="contact_person" value="<?= e($client['contact_person'] ?? '') ?>" placeholder="ФИО контактного лица в организации">
     </div>
     <label>Заметки</label>
     <textarea name="notes"><?= e($client['notes']) ?></textarea>
@@ -125,6 +158,29 @@ require __DIR__ . '/includes/layout_top.php';
         </td>
         <td><?= crm_money($o['price'] !== null ? (float)$o['price'] : null) ?></td>
         <td><?= crm_date($o['created_at'], 'd.m.Y') ?></td>
+      </tr>
+      <?php endforeach; ?>
+    </tbody>
+  </table>
+  <?php endif; ?>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0;">Претензии и возвраты</h3>
+  <?php if (!$clientClaims): ?>
+    <div class="empty-state">Претензий нет.</div>
+  <?php else: ?>
+  <table>
+    <thead><tr><th>№ заявки</th><th>Маршрут</th><th>Причина</th><th>Статус</th><th>Компенсация</th><th>Создана</th></tr></thead>
+    <tbody>
+      <?php foreach ($clientClaims as $cl): ?>
+      <tr>
+        <td><a href="/crm/claim.php?id=<?= (int)$cl['id'] ?>">№<?= (int)$cl['id'] ?> (заявка #<?= (int)$cl['order_id'] ?>)</a></td>
+        <td><?= e($cl['from_city']) ?> → <?= e($cl['to_city']) ?></td>
+        <td><?= e(crm_claim_reason_label($cl['reason'])) ?></td>
+        <td><span class="badge <?= crm_claim_status_class($cl['status']) ?>"><?= e(crm_claim_status_label($cl['status'])) ?></span></td>
+        <td><?= crm_money($cl['compensation_amount'] !== null ? (float)$cl['compensation_amount'] : null) ?></td>
+        <td><?= crm_date($cl['created_at'], 'd.m.Y') ?></td>
       </tr>
       <?php endforeach; ?>
     </tbody>

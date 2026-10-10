@@ -24,9 +24,13 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS clients (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(200) NOT NULL,
+    client_type ENUM('individual','company') NOT NULL DEFAULT 'individual',
     phone VARCHAR(40) DEFAULT NULL,
     email VARCHAR(150) DEFAULT NULL,
     address VARCHAR(500) DEFAULT NULL,
+    inn VARCHAR(20) DEFAULT NULL,
+    kpp VARCHAR(20) DEFAULT NULL,
+    contact_person VARCHAR(255) DEFAULT NULL,
     notes TEXT DEFAULT NULL,
     created_by INT UNSIGNED DEFAULT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -111,6 +115,28 @@ CREATE TABLE IF NOT EXISTS payments (
     FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,
     FOREIGN KEY (recorded_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==========================================================
+-- Претензии и возвраты по заявкам
+-- ==========================================================
+CREATE TABLE IF NOT EXISTS claims (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    order_id INT UNSIGNED NOT NULL,
+    reason ENUM('defect','loss','return','other') NOT NULL DEFAULT 'other',
+    description TEXT DEFAULT NULL,
+    photo_path VARCHAR(500) DEFAULT NULL,
+    compensation_amount DECIMAL(12,2) DEFAULT NULL,
+    status ENUM('open','in_progress','resolved','rejected') NOT NULL DEFAULT 'open',
+    response_due_date DATE DEFAULT NULL,
+    created_by INT UNSIGNED DEFAULT NULL,
+    resolved_at DATETIME DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_claims_order (order_id),
+    INDEX idx_claims_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ==========================================================
 -- График платежей по рассрочке
