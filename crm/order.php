@@ -121,11 +121,94 @@ if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') 
     crm_redirect('/crm/order.php?id=' . $id);
 }
 
+// Постоплата — договорились, что клиент заплатит после получения груза
+if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'mark_postpaid') {
+    crm_csrf_check();
+    $pdo->prepare('UPDATE orders SET payment_status = ? WHERE id = ?')->execute(['postpaid', $id]);
+    crm_flash_set('Заявка отмечена как постоплата (клиент заплатит после доставки).');
+    crm_redirect('/crm/order.php?id=' . $id);
+}
+
+if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'unmark_postpaid') {
+    crm_csrf_check();
+    $pdo->prepare('UPDATE orders SET payment_status = ? WHERE id = ?')->execute(['unpaid', $id]);
+    crm_flash_set('Отметка постоплаты снята.');
+    crm_redirect('/crm/order.php?id=' . $id);
+}
+
+// Рассрочка — график платежей
+if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add_installment') {
+    crm_csrf_check();
+    $amount = (float) str_replace(',', '.', $_POST['amount'] ?? '0');
+    $dueDate = $_POST['due_date'] !== '' ? $_POST['due_date'] : null;
+    if ($amount <= 0) {
+        crm_flash_set('Укажите сумму платежа больше нуля.', 'err');
+    } else {
+        $pdo->prepare('INSERT INTO order_installments (order_id, due_date, amount) VALUES (?,?,?)')
+            ->execute([$id, $dueDate, $amount]);
+        // Отмечаем, что заявка оплачивается в рассрочку (если ещё не отмечена иначе).
+        if ($order['payment_method'] !== 'installment' || $order['payment_status'] === 'unpaid') {
+            $pdo->prepare('UPDATE orders SET payment_method = ?, payment_status = ? WHERE id = ?')
+                ->execute(['installment', 'unpaid', $id]);
+        }
+        crm_flash_set('Платёж добавлен в график рассрочки.');
+    }
+    crm_redirect('/crm/order.php?id=' . $id);
+}
+
+if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'mark_installment_paid') {
+    crm_csrf_check();
+    $instId = (int) ($_POST['installment_id'] ?? 0);
+    $chk = $pdo->prepare('SELECT id FROM order_installments WHERE id = ? AND order_id = ?');
+    $chk->execute([$instId, $id]);
+    if ($chk->fetch()) {
+        $pdo->prepare('UPDATE order_installments SET status = "paid", paid_at = NOW() WHERE id = ?')->execute([$instId]);
+        // Если график полностью оплачен — переводим заявку в "Оплачен".
+        $totals = crm_order_installments_totals($pdo, $id);
+        if ($totals['cnt'] > 0 && $totals['paid_cnt'] === $totals['cnt']) {
+            $pdo->prepare('UPDATE orders SET payment_status = "paid", payment_method = "installment" WHERE id = ?')->execute([$id]);
+        }
+        crm_flash_set('Платёж отмечен оплаченным.');
+    }
+    crm_redirect('/crm/order.php?id=' . $id);
+}
+
+if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'unmark_installment_paid') {
+    crm_csrf_check();
+    $instId = (int) ($_POST['installment_id'] ?? 0);
+    $chk = $pdo->prepare('SELECT id FROM order_installments WHERE id = ? AND order_id = ?');
+    $chk->execute([$instId, $id]);
+    if ($chk->fetch()) {
+        $pdo->prepare('UPDATE order_installments SET status = "pending", paid_at = NULL WHERE id = ?')->execute([$instId]);
+        // Если заявка была отмечена "Оплачен" по рассрочке — возвращаем в "Не оплачен".
+        if ($order['payment_status'] === 'paid' && $order['payment_method'] === 'installment') {
+            $pdo->prepare('UPDATE orders SET payment_status = "unpaid" WHERE id = ?')->execute([$id]);
+        }
+        crm_flash_set('Отметка оплаты по платежу снята.');
+    }
+    crm_redirect('/crm/order.php?id=' . $id);
+}
+
+if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_installment') {
+    crm_csrf_check();
+    $instId = (int) ($_POST['installment_id'] ?? 0);
+    $pdo->prepare("DELETE FROM order_installments WHERE id = ? AND order_id = ? AND status = 'pending'")->execute([$instId, $id]);
+    crm_flash_set('Платёж удалён из графика.');
+    crm_redirect('/crm/order.php?id=' . $id);
+}
+
 $history = [];
+$installments = [];
+$installmentTotals = ['total' => 0, 'paid' => 0, 'remaining' => 0, 'cnt' => 0, 'paid_cnt' => 0];
 if ($order) {
     $h = $pdo->prepare('SELECT h.*, u.name AS user_name FROM order_status_history h LEFT JOIN users u ON u.id = h.changed_by WHERE order_id = ? ORDER BY changed_at DESC');
     $h->execute([$id]);
     $history = $h->fetchAll();
+
+    $instStmt = $pdo->prepare('SELECT * FROM order_installments WHERE order_id = ? ORDER BY due_date IS NULL, due_date, id');
+    $instStmt->execute([$id]);
+    $installments = $instStmt->fetchAll();
+    $installmentTotals = crm_order_installments_totals($pdo, $id);
 }
 
 $preselectClientId = (int) ($_GET['client_id'] ?? 0);
@@ -183,10 +266,11 @@ require __DIR__ . '/includes/layout_top.php';
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
     <div>
       <span class="badge <?= crm_order_status_class($order['status']) ?>" style="font-size:.85rem;"><?= e(crm_order_status_label($order['status'])) ?></span>
-      <?php if ($order['payment_status'] === 'paid'): ?>
-        <span class="badge badge-green" style="font-size:.85rem;">Оплачен — <?= e(crm_payment_method_label($order['payment_method'])) ?></span>
-      <?php else: ?>
-        <span class="badge badge-grey" style="font-size:.85rem;">Не оплачен</span>
+      <span class="badge <?= crm_payment_status_class($order['payment_status']) ?>" style="font-size:.85rem;">
+        <?= e(crm_payment_status_label($order['payment_status'])) ?><?php if ($order['payment_status'] === 'paid'): ?> — <?= e(crm_payment_method_label($order['payment_method'])) ?><?php endif; ?>
+      </span>
+      <?php if ($order['payment_method'] === 'installment' && $installmentTotals['cnt'] > 0): ?>
+        <span class="badge badge-blue" style="font-size:.85rem;">Рассрочка: оплачено <?= crm_money($installmentTotals['paid']) ?> из <?= crm_money($installmentTotals['total']) ?></span>
       <?php endif; ?>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
@@ -209,11 +293,86 @@ require __DIR__ . '/includes/layout_top.php';
           </select>
           <button class="btn small secondary" type="submit">Отметить оплаченным</button>
         </form>
+        <?php if ($order['payment_status'] === 'postpaid'): ?>
+          <form method="post" class="inline">
+            <?= crm_csrf_field() ?>
+            <input type="hidden" name="action" value="unmark_postpaid">
+            <button class="btn small secondary" type="submit">Снять отметку постоплаты</button>
+          </form>
+        <?php else: ?>
+          <form method="post" class="inline">
+            <?= crm_csrf_field() ?>
+            <input type="hidden" name="action" value="mark_postpaid">
+            <button class="btn small secondary" type="submit">Постоплата (после доставки)</button>
+          </form>
+        <?php endif; ?>
       <?php endif; ?>
       <a class="btn small" href="/crm/invoice.php?order_id=<?= (int)$order['id'] ?>">Выставить счёт</a>
       <a class="btn small secondary" href="/crm/waybill.php?id=<?= (int)$order['id'] ?>" target="_blank">Печать накладной</a>
     </div>
   </div>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0;">Рассрочка — график платежей</h3>
+  <?php if (!$installments): ?>
+    <div class="empty-state">Рассрочка не оформлена.</div>
+  <?php else: ?>
+    <table>
+      <thead><tr><th>Дата платежа</th><th>Сумма</th><th>Статус</th><th></th></tr></thead>
+      <tbody>
+        <?php foreach ($installments as $inst): ?>
+        <tr>
+          <td><?= $inst['due_date'] ? crm_date($inst['due_date'], 'd.m.Y') : '—' ?></td>
+          <td><?= crm_money((float) $inst['amount']) ?></td>
+          <td>
+            <?php if ($inst['status'] === 'paid'): ?>
+              <span class="badge badge-green">Оплачен <?= $inst['paid_at'] ? crm_date($inst['paid_at'], 'd.m.Y') : '' ?></span>
+            <?php else: ?>
+              <span class="badge badge-grey">Ожидает</span>
+            <?php endif; ?>
+          </td>
+          <td style="display:flex;gap:6px;flex-wrap:wrap;">
+            <?php if ($inst['status'] === 'paid'): ?>
+              <form method="post" class="inline">
+                <?= crm_csrf_field() ?>
+                <input type="hidden" name="action" value="unmark_installment_paid">
+                <input type="hidden" name="installment_id" value="<?= (int) $inst['id'] ?>">
+                <button class="btn small secondary" type="submit">Снять оплату</button>
+              </form>
+            <?php else: ?>
+              <form method="post" class="inline">
+                <?= crm_csrf_field() ?>
+                <input type="hidden" name="action" value="mark_installment_paid">
+                <input type="hidden" name="installment_id" value="<?= (int) $inst['id'] ?>">
+                <button class="btn small secondary" type="submit">Отметить оплаченным</button>
+              </form>
+              <form method="post" class="inline" onsubmit="return confirm('Удалить платёж из графика?');">
+                <?= crm_csrf_field() ?>
+                <input type="hidden" name="action" value="delete_installment">
+                <input type="hidden" name="installment_id" value="<?= (int) $inst['id'] ?>">
+                <button class="btn small danger" type="submit">Удалить</button>
+              </form>
+            <?php endif; ?>
+          </td>
+        </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+    <p class="text-muted" style="margin-top:10px;">
+      Оплачено <?= crm_money($installmentTotals['paid']) ?> из <?= crm_money($installmentTotals['total']) ?>
+      (осталось <?= crm_money($installmentTotals['remaining']) ?>). Когда оплачены все платежи графика —
+      заявка автоматически отмечается «Оплачен».
+    </p>
+  <?php endif; ?>
+
+  <form method="post" class="form-row" style="align-items:end;margin-top:12px;">
+    <?= crm_csrf_field() ?>
+    <input type="hidden" name="action" value="add_installment">
+    <div><label>Дата платежа</label><input type="date" name="due_date"></div>
+    <div><label>Сумма, ₽</label><input type="number" step="0.01" name="amount" required></div>
+    <div class="form-actions"><button class="btn secondary" type="submit">Добавить платёж в график</button></div>
+  </form>
 </div>
 
 <div class="card">

@@ -52,8 +52,8 @@ CREATE TABLE IF NOT EXISTS orders (
     weight_kg DECIMAL(8,2) DEFAULT NULL,
     declared_value DECIMAL(12,2) DEFAULT NULL,
     price DECIMAL(12,2) DEFAULT NULL,
-    payment_status ENUM('unpaid','paid') NOT NULL DEFAULT 'unpaid',
-    payment_method ENUM('online','cash','terminal','invoice') DEFAULT NULL,
+    payment_status ENUM('unpaid','postpaid','paid') NOT NULL DEFAULT 'unpaid',
+    payment_method ENUM('online','cash','terminal','invoice','installment') DEFAULT NULL,
     planned_date DATE DEFAULT NULL,
     comment TEXT DEFAULT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -111,6 +111,21 @@ CREATE TABLE IF NOT EXISTS payments (
     FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,
     FOREIGN KEY (recorded_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==========================================================
+-- График платежей по рассрочке
+-- ==========================================================
+CREATE TABLE IF NOT EXISTS order_installments (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    order_id INT UNSIGNED NOT NULL,
+    due_date DATE DEFAULT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    status ENUM('pending','paid') NOT NULL DEFAULT 'pending',
+    paid_at DATETIME DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    INDEX idx_order_installments_order (order_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 SET FOREIGN_KEY_CHECKS = 1;
 

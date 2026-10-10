@@ -165,7 +165,9 @@ function wb_check(bool $on): string
     <?= wb_check($order['payment_method'] === 'cash') ?> Наличный расчёт &nbsp;&nbsp;
     <?= wb_check($order['payment_method'] === 'terminal') ?> Оплата через терминал &nbsp;&nbsp;
     <?= wb_check($order['payment_method'] === 'invoice') ?> Оплата по счёту &nbsp;&nbsp;
-    <?= wb_check($order['payment_method'] === 'online') ?> Онлайн на сайте
+    <?= wb_check($order['payment_method'] === 'online') ?> Онлайн на сайте &nbsp;&nbsp;
+    <?= wb_check($order['payment_method'] === 'installment') ?> Рассрочка<br>
+    <?= wb_check($order['payment_status'] === 'postpaid') ?> Постоплата (после получения груза)
   </div>
 
   <div class="sign-row">

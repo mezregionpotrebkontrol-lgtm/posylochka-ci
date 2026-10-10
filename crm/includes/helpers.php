@@ -33,11 +33,55 @@ function crm_order_status_class(string $status): string
 function crm_payment_method_label(?string $method): string
 {
     return [
-        'online'   => 'Онлайн на сайте',
-        'cash'     => 'Наличный расчёт',
-        'terminal' => 'Оплата через терминал',
-        'invoice'  => 'Оплата по счёту',
+        'online'      => 'Онлайн на сайте',
+        'cash'        => 'Наличный расчёт',
+        'terminal'    => 'Оплата через терминал',
+        'invoice'     => 'Оплата по счёту',
+        'installment' => 'Рассрочка',
     ][$method] ?? '—';
+}
+
+function crm_payment_status_label(string $status): string
+{
+    return [
+        'unpaid'   => 'Не оплачен',
+        'postpaid' => 'Постоплата — после доставки',
+        'paid'     => 'Оплачен',
+    ][$status] ?? $status;
+}
+
+function crm_payment_status_class(string $status): string
+{
+    return [
+        'unpaid'   => 'badge-grey',
+        'postpaid' => 'badge-orange',
+        'paid'     => 'badge-green',
+    ][$status] ?? 'badge-grey';
+}
+
+/**
+ * Итоги по графику рассрочки для одной заявки: общая сумма графика, сколько
+ * уже оплачено и сколько осталось.
+ */
+function crm_order_installments_totals(PDO $pdo, int $orderId): array
+{
+    $stmt = $pdo->prepare('SELECT
+        COALESCE(SUM(amount), 0) AS total,
+        COALESCE(SUM(CASE WHEN status = "paid" THEN amount ELSE 0 END), 0) AS paid,
+        COUNT(*) AS cnt,
+        COUNT(CASE WHEN status = "paid" THEN 1 END) AS paid_cnt
+        FROM order_installments WHERE order_id = ?');
+    $stmt->execute([$orderId]);
+    $row = $stmt->fetch();
+    $total = (float) $row['total'];
+    $paid = (float) $row['paid'];
+    return [
+        'total'     => $total,
+        'paid'      => $paid,
+        'remaining' => $total - $paid,
+        'cnt'       => (int) $row['cnt'],
+        'paid_cnt'  => (int) $row['paid_cnt'],
+    ];
 }
 
 function crm_invoice_status_label(string $status): string
