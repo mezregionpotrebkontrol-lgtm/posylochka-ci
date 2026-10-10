@@ -5,7 +5,8 @@ $pdo = crm_db();
 
 $from = $_GET['from'] ?? date('Y-m-01');
 $to   = $_GET['to']   ?? date('Y-m-d');
-$granularity = in_array($_GET['granularity'] ?? 'day', ['day', 'week', 'month'], true) ? $_GET['granularity'] : 'day';
+$granularityParam = $_GET['granularity'] ?? 'day';
+$granularity = in_array($granularityParam, ['day', 'week', 'month'], true) ? $granularityParam : 'day';
 
 /**
  * Заявки за период вместе с суммой уже оплаченных платежей по рассрочке
