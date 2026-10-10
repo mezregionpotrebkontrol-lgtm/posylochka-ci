@@ -5,18 +5,23 @@ $pdo = crm_db();
 
 $statusFilter = $_GET['status'] ?? '';
 $courierFilter = $_GET['courier'] ?? '';
+$pickupFilter = $_GET['pickup'] ?? '';
 $search = trim($_GET['q'] ?? '');
 
 $where = [];
 $params = [];
 
-if ($statusFilter !== '' && in_array($statusFilter, ['new','accepted','in_transit','delivered','cancelled'], true)) {
+if ($statusFilter !== '' && in_array($statusFilter, ['new','accepted','collecting','in_transit','delivered','cancelled'], true)) {
     $where[] = 'o.status = ?';
     $params[] = $statusFilter;
 }
 if ($courierFilter !== '') {
     $where[] = 'o.courier_id = ?';
     $params[] = (int) $courierFilter;
+}
+if ($pickupFilter !== '' && in_array($pickupFilter, ['self','courier'], true)) {
+    $where[] = 'o.pickup_type = ?';
+    $params[] = $pickupFilter;
 }
 if ($search !== '') {
     $where[] = '(c.name LIKE ? OR c.phone LIKE ? OR o.id = ?)';
@@ -56,7 +61,7 @@ require __DIR__ . '/includes/layout_top.php';
       <label>Статус</label>
       <select name="status">
         <option value="">Все</option>
-        <?php foreach (['new','accepted','in_transit','delivered','cancelled'] as $s): ?>
+        <?php foreach (['new','accepted','collecting','in_transit','delivered','cancelled'] as $s): ?>
           <option value="<?= $s ?>" <?= $statusFilter === $s ? 'selected' : '' ?>><?= e(crm_order_status_label($s)) ?></option>
         <?php endforeach; ?>
       </select>
@@ -70,8 +75,17 @@ require __DIR__ . '/includes/layout_top.php';
         <?php endforeach; ?>
       </select>
     </div>
+    <div class="field">
+      <label>Получение груза</label>
+      <select name="pickup">
+        <option value="">Все</option>
+        <option value="self" <?= $pickupFilter === 'self' ? 'selected' : '' ?>>Самостоятельно</option>
+        <option value="courier" <?= $pickupFilter === 'courier' ? 'selected' : '' ?>>Выездной автосбор</option>
+      </select>
+    </div>
     <button class="btn secondary" type="submit">Применить</button>
     <a class="btn secondary" href="/crm/orders.php">Сбросить</a>
+    <a class="btn secondary" href="/crm/orders.php?pickup=courier">Выездной автосбор</a>
     <a class="btn" href="/crm/order.php" style="margin-left:auto;">+ Новая заявка</a>
   </form>
 </div>
@@ -83,7 +97,7 @@ require __DIR__ . '/includes/layout_top.php';
   <table>
     <thead>
       <tr>
-        <th>№</th><th>Клиент</th><th>Маршрут</th><th>Курьер</th><th>Статус</th><th>Оплата</th><th>Сумма</th><th>Создана</th>
+        <th>№</th><th>Клиент</th><th>Маршрут</th><th>Получение</th><th>Курьер</th><th>Статус</th><th>Оплата</th><th>Сумма</th><th>Создана</th>
       </tr>
     </thead>
     <tbody>
@@ -92,6 +106,7 @@ require __DIR__ . '/includes/layout_top.php';
         <td><a href="/crm/order.php?id=<?= (int)$o['id'] ?>">#<?= (int)$o['id'] ?></a></td>
         <td><a href="/crm/client.php?id=<?= (int)$o['client_id'] ?>"><?= e($o['client_name']) ?></a><br><span class="text-muted"><?= e($o['client_phone']) ?></span></td>
         <td><?= e($o['from_city']) ?> → <?= e($o['to_city']) ?></td>
+        <td><span class="badge <?= crm_pickup_type_class($o['pickup_type'] ?? 'self') ?>"><?= e(crm_pickup_type_label($o['pickup_type'] ?? 'self')) ?></span></td>
         <td><?= $o['courier_name'] ? e($o['courier_name']) : '<span class="text-muted">не назначен</span>' ?></td>
         <td><span class="badge <?= crm_order_status_class($o['status']) ?>"><?= e(crm_order_status_label($o['status'])) ?></span></td>
         <td>

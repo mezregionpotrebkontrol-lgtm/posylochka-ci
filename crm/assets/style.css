@@ -9,6 +9,7 @@
   --green:#1a7f37;
   --red:#c0392b;
   --orange:#b26a00;
+  --purple:#6b3fa0;
   --grey:#6b7490;
 }
 *{box-sizing:border-box;}
@@ -107,6 +108,7 @@ tr:hover td{background:#f8f9fd;}
 .badge-orange{background:#fdecd2;color:var(--orange);}
 .badge-green{background:#d9f2e2;color:var(--green);}
 .badge-red{background:#fbe0dc;color:var(--red);}
+.badge-purple{background:#ece2f7;color:var(--purple);}
 
 .btn{
   display:inline-block;

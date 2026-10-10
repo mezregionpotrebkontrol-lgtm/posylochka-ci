@@ -19,17 +19,19 @@ if ($id) {
 
 $clients = $pdo->query('SELECT id, name, phone FROM clients ORDER BY name')->fetchAll();
 $couriers = $pdo->query("SELECT id, name FROM users WHERE role = 'courier' AND active = 1 ORDER BY name")->fetchAll();
+$formingRuns = $pdo->query("SELECT id, from_city, to_city, run_date FROM shipment_runs WHERE status = 'forming' ORDER BY run_date IS NULL, run_date, id DESC")->fetchAll();
 
 // Создание новой заявки
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'create') {
     crm_csrf_check();
     $clientId = (int) ($_POST['client_id'] ?? 0);
+    $pickupType = ($_POST['pickup_type'] ?? '') === 'courier' ? 'courier' : 'self';
     if (!$clientId) {
         crm_flash_set('Выберите клиента.', 'err');
     } else {
         $stmt = $pdo->prepare('INSERT INTO orders
-            (client_id, created_by, from_city, to_city, from_address, to_address, cargo_description, weight_kg, declared_value, price, planned_date, comment, status)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,\'new\')');
+            (client_id, created_by, from_city, to_city, from_address, to_address, cargo_description, weight_kg, declared_value, price, planned_date, comment, pickup_type, status)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,\'new\')');
         $stmt->execute([
             $clientId,
             $user['id'],
@@ -43,6 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
             $_POST['price'] !== '' ? (float) $_POST['price'] : null,
             $_POST['planned_date'] !== '' ? $_POST['planned_date'] : null,
             trim($_POST['comment'] ?? '') ?: null,
+            $pickupType,
         ]);
         $newId = (int) $pdo->lastInsertId();
         $pdo->prepare('INSERT INTO order_status_history (order_id, status, changed_by, comment) VALUES (?, \'new\', ?, \'Заявка создана\')')
@@ -55,7 +58,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
 // Обновление существующей заявки (данные)
 if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update') {
     crm_csrf_check();
-    $stmt = $pdo->prepare('UPDATE orders SET from_city=?, to_city=?, from_address=?, to_address=?, cargo_description=?, weight_kg=?, declared_value=?, price=?, planned_date=?, comment=? WHERE id=?');
+    $pickupType = ($_POST['pickup_type'] ?? '') === 'courier' ? 'courier' : 'self';
+    $stmt = $pdo->prepare('UPDATE orders SET from_city=?, to_city=?, from_address=?, to_address=?, cargo_description=?, weight_kg=?, declared_value=?, price=?, planned_date=?, comment=?, pickup_type=? WHERE id=?');
     $stmt->execute([
         trim($_POST['from_city'] ?? '') ?: 'Дербент',
         trim($_POST['to_city'] ?? '') ?: 'Санкт-Петербург',
@@ -67,6 +71,7 @@ if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') 
         $_POST['price'] !== '' ? (float) $_POST['price'] : null,
         $_POST['planned_date'] !== '' ? $_POST['planned_date'] : null,
         trim($_POST['comment'] ?? '') ?: null,
+        $pickupType,
         $id,
     ]);
     crm_flash_set('Заявка обновлена.');
@@ -82,11 +87,20 @@ if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') 
     crm_redirect('/crm/order.php?id=' . $id);
 }
 
+// Назначение/снятие сборного рейса
+if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'assign_shipment_run') {
+    crm_csrf_check();
+    $runId = $_POST['shipment_run_id'] !== '' ? (int) $_POST['shipment_run_id'] : null;
+    $pdo->prepare('UPDATE orders SET shipment_run_id = ? WHERE id = ?')->execute([$runId, $id]);
+    crm_flash_set($runId ? 'Заявка добавлена в сборный рейс.' : 'Заявка убрана из сборного рейса.');
+    crm_redirect('/crm/order.php?id=' . $id);
+}
+
 // Смена статуса
 if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'change_status') {
     crm_csrf_check();
     $newStatus = $_POST['status'] ?? '';
-    $allowed = ['new','accepted','in_transit','delivered','cancelled'];
+    $allowed = ['new','accepted','collecting','in_transit','delivered','cancelled'];
     if (in_array($newStatus, $allowed, true)) {
         $pdo->prepare('UPDATE orders SET status = ? WHERE id = ?')->execute([$newStatus, $id]);
         $pdo->prepare('INSERT INTO order_status_history (order_id, status, changed_by, comment) VALUES (?,?,?,?)')
@@ -216,6 +230,13 @@ if ($order) {
     $orderClaims = $claimsStmt->fetchAll();
 }
 
+$currentRun = null;
+if ($order && $order['shipment_run_id']) {
+    $rStmt = $pdo->prepare('SELECT * FROM shipment_runs WHERE id = ?');
+    $rStmt->execute([$order['shipment_run_id']]);
+    $currentRun = $rStmt->fetch();
+}
+
 $preselectClientId = (int) ($_GET['client_id'] ?? 0);
 
 $pageTitle = $order ? ('Заявка №' . $order['id']) : 'Новая заявка';
@@ -249,6 +270,11 @@ require __DIR__ . '/includes/layout_top.php';
       <div><label>Адрес отправления</label><input type="text" name="from_address"></div>
       <div><label>Адрес получения</label><input type="text" name="to_address"></div>
     </div>
+    <label>Способ получения груза от отправителя</label>
+    <select name="pickup_type">
+      <option value="self">Самостоятельно (клиент привозит сам)</option>
+      <option value="courier">Выездной сбор (курьер забирает по адресу отправления)</option>
+    </select>
     <label>Описание груза</label>
     <input type="text" name="cargo_description" placeholder="например: коробка, 2 места">
     <div class="form-row">
@@ -276,6 +302,9 @@ require __DIR__ . '/includes/layout_top.php';
       </span>
       <?php if ($order['payment_method'] === 'installment' && $installmentTotals['cnt'] > 0): ?>
         <span class="badge badge-blue" style="font-size:.85rem;">Рассрочка: оплачено <?= crm_money($installmentTotals['paid']) ?> из <?= crm_money($installmentTotals['total']) ?></span>
+      <?php endif; ?>
+      <?php if (($order['pickup_type'] ?? 'self') === 'courier'): ?>
+        <span class="badge <?= crm_pickup_type_class($order['pickup_type']) ?>" style="font-size:.85rem;"><?= e(crm_pickup_type_label($order['pickup_type'])) ?></span>
       <?php endif; ?>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
@@ -398,6 +427,11 @@ require __DIR__ . '/includes/layout_top.php';
       <div><label>Адрес отправления</label><input type="text" name="from_address" value="<?= e($order['from_address']) ?>"></div>
       <div><label>Адрес получения</label><input type="text" name="to_address" value="<?= e($order['to_address']) ?>"></div>
     </div>
+    <label>Способ получения груза от отправителя</label>
+    <select name="pickup_type">
+      <option value="self" <?= ($order['pickup_type'] ?? 'self') === 'self' ? 'selected' : '' ?>>Самостоятельно (клиент привозит сам)</option>
+      <option value="courier" <?= ($order['pickup_type'] ?? 'self') === 'courier' ? 'selected' : '' ?>>Выездной сбор (курьер забирает по адресу отправления)</option>
+    </select>
     <label>Описание груза</label>
     <input type="text" name="cargo_description" value="<?= e($order['cargo_description']) ?>">
     <div class="form-row">
@@ -433,6 +467,31 @@ require __DIR__ . '/includes/layout_top.php';
 </div>
 
 <div class="card">
+  <h3 style="margin-top:0;">Сборный рейс</h3>
+  <?php if ($currentRun): ?>
+    <p>Заявка включена в рейс <a href="/crm/shipments.php?id=<?= (int) $currentRun['id'] ?>">№<?= (int) $currentRun['id'] ?> — <?= e($currentRun['from_city']) ?> → <?= e($currentRun['to_city']) ?><?= $currentRun['run_date'] ? ', ' . e(crm_date($currentRun['run_date'], 'd.m.Y')) : '' ?></a>
+    <span class="badge <?= crm_shipment_run_status_class($currentRun['status']) ?>"><?= e(crm_shipment_run_status_label($currentRun['status'])) ?></span></p>
+  <?php else: ?>
+    <div class="empty-state">Заявка пока не включена ни в один сборный рейс.</div>
+  <?php endif; ?>
+  <form method="post" class="form-row" style="align-items:end;">
+    <?= crm_csrf_field() ?>
+    <input type="hidden" name="action" value="assign_shipment_run">
+    <div>
+      <label>Назначить в рейс</label>
+      <select name="shipment_run_id">
+        <option value="">— не включена —</option>
+        <?php foreach ($formingRuns as $r): ?>
+          <option value="<?= (int)$r['id'] ?>" <?= $currentRun && (int)$currentRun['id'] === (int)$r['id'] ? 'selected' : '' ?>>№<?= (int)$r['id'] ?> — <?= e($r['from_city']) ?> → <?= e($r['to_city']) ?><?= $r['run_date'] ? ', ' . e(crm_date($r['run_date'], 'd.m.Y')) : '' ?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+    <div class="form-actions"><button class="btn secondary" type="submit">Сохранить</button></div>
+  </form>
+  <p class="text-muted" style="margin-top:10px;margin-bottom:0;">Новый рейс можно создать на странице <a href="/crm/shipments.php">«Рейсы»</a>.</p>
+</div>
+
+<div class="card">
   <h3 style="margin-top:0;">Изменить статус</h3>
   <form method="post" class="form-row" style="align-items:end;">
     <?= crm_csrf_field() ?>
@@ -440,7 +499,7 @@ require __DIR__ . '/includes/layout_top.php';
     <div>
       <label>Новый статус</label>
       <select name="status">
-        <?php foreach (['new','accepted','in_transit','delivered','cancelled'] as $s): ?>
+        <?php foreach (['new','accepted','collecting','in_transit','delivered','cancelled'] as $s): ?>
           <option value="<?= $s ?>" <?= $order['status'] === $s ? 'selected' : '' ?>><?= e(crm_order_status_label($s)) ?></option>
         <?php endforeach; ?>
       </select>

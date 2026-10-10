@@ -10,6 +10,7 @@ if ($user['role'] === 'courier') {
 $stats = $pdo->query("SELECT
     (SELECT COUNT(*) FROM orders WHERE status = 'new') AS cnt_new,
     (SELECT COUNT(*) FROM orders WHERE status = 'accepted') AS cnt_accepted,
+    (SELECT COUNT(*) FROM orders WHERE status = 'collecting') AS cnt_collecting,
     (SELECT COUNT(*) FROM orders WHERE status = 'in_transit') AS cnt_in_transit,
     (SELECT COUNT(*) FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()) AS cnt_delivered_today,
     (SELECT COUNT(*) FROM clients) AS cnt_clients,
@@ -26,6 +27,7 @@ require __DIR__ . '/includes/layout_top.php';
 <div class="grid-stats">
   <div class="stat"><div class="num"><?= (int)$stats['cnt_new'] ?></div><div class="label">Новых заявок</div></div>
   <div class="stat"><div class="num"><?= (int)$stats['cnt_accepted'] ?></div><div class="label">Принято, ждут отправки</div></div>
+  <div class="stat"><div class="num"><?= (int)$stats['cnt_collecting'] ?></div><div class="label">Идёт сбор груза</div></div>
   <div class="stat"><div class="num"><?= (int)$stats['cnt_in_transit'] ?></div><div class="label">В пути</div></div>
   <div class="stat"><div class="num"><?= (int)$stats['cnt_delivered_today'] ?></div><div class="label">Доставлено сегодня</div></div>
   <div class="stat"><div class="num"><?= (int)$stats['cnt_clients'] ?></div><div class="label">Клиентов в базе</div></div>

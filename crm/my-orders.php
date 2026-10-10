@@ -6,7 +6,7 @@ $user = crm_require_role(['courier', 'admin']);
 $pdo = crm_db();
 
 // Курьеру можно менять статус только на эти значения
-$courierAllowedStatuses = ['accepted', 'in_transit', 'delivered'];
+$courierAllowedStatuses = ['accepted', 'collecting', 'in_transit', 'delivered'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'change_status') {
     crm_csrf_check();
@@ -76,6 +76,9 @@ require __DIR__ . '/includes/layout_top.php';
                 <input type="hidden" name="status" value="accepted">
                 <button class="btn small" type="submit">Принять</button>
               <?php elseif ($o['status'] === 'accepted'): ?>
+                <input type="hidden" name="status" value="collecting">
+                <button class="btn small" type="submit">Начать сбор груза</button>
+              <?php elseif ($o['status'] === 'collecting'): ?>
                 <input type="hidden" name="status" value="in_transit">
                 <button class="btn small" type="submit">В пути</button>
               <?php elseif ($o['status'] === 'in_transit'): ?>

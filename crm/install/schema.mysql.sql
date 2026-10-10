@@ -40,6 +40,23 @@ CREATE TABLE IF NOT EXISTS clients (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==========================================================
+-- Сборные рейсы (группировка заявок по маршруту/дате для совместной перевозки)
+-- ==========================================================
+CREATE TABLE IF NOT EXISTS shipment_runs (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    from_city VARCHAR(150) NOT NULL DEFAULT 'Дербент',
+    to_city VARCHAR(150) NOT NULL DEFAULT 'Санкт-Петербург',
+    run_date DATE DEFAULT NULL,
+    status ENUM('forming','in_transit','completed') NOT NULL DEFAULT 'forming',
+    notes VARCHAR(500) DEFAULT NULL,
+    created_by INT UNSIGNED DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_shipment_runs_status (status),
+    INDEX idx_shipment_runs_date (run_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==========================================================
 -- Заявки на доставку
 -- ==========================================================
 CREATE TABLE IF NOT EXISTS orders (
@@ -47,7 +64,9 @@ CREATE TABLE IF NOT EXISTS orders (
     client_id INT UNSIGNED NOT NULL,
     created_by INT UNSIGNED DEFAULT NULL,
     courier_id INT UNSIGNED DEFAULT NULL,
-    status ENUM('new','accepted','in_transit','delivered','cancelled') NOT NULL DEFAULT 'new',
+    shipment_run_id INT UNSIGNED DEFAULT NULL,
+    status ENUM('new','accepted','collecting','in_transit','delivered','cancelled') NOT NULL DEFAULT 'new',
+    pickup_type ENUM('self','courier') NOT NULL DEFAULT 'self',
     from_city VARCHAR(150) DEFAULT 'Дербент',
     to_city VARCHAR(150) DEFAULT 'Санкт-Петербург',
     from_address VARCHAR(500) DEFAULT NULL,
@@ -65,9 +84,11 @@ CREATE TABLE IF NOT EXISTS orders (
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
     FOREIGN KEY (courier_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (shipment_run_id) REFERENCES shipment_runs(id) ON DELETE SET NULL,
     INDEX idx_orders_status (status),
     INDEX idx_orders_courier (courier_id),
-    INDEX idx_orders_planned_date (planned_date)
+    INDEX idx_orders_planned_date (planned_date),
+    INDEX idx_orders_shipment_run (shipment_run_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==========================================================
@@ -76,7 +97,7 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE TABLE IF NOT EXISTS order_status_history (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     order_id INT UNSIGNED NOT NULL,
-    status ENUM('new','accepted','in_transit','delivered','cancelled') NOT NULL,
+    status ENUM('new','accepted','collecting','in_transit','delivered','cancelled') NOT NULL,
     changed_by INT UNSIGNED DEFAULT NULL,
     comment VARCHAR(500) DEFAULT NULL,
     changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

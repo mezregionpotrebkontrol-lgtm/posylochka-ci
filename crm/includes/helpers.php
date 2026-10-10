@@ -13,6 +13,7 @@ function crm_order_status_label(string $status): string
     return [
         'new'        => 'Новая',
         'accepted'   => 'Принята',
+        'collecting' => 'Сбор груза',
         'in_transit' => 'В пути',
         'delivered'  => 'Доставлена',
         'cancelled'  => 'Отменена',
@@ -24,9 +25,51 @@ function crm_order_status_class(string $status): string
     return [
         'new'        => 'badge-grey',
         'accepted'   => 'badge-blue',
+        'collecting' => 'badge-purple',
         'in_transit' => 'badge-orange',
         'delivered'  => 'badge-green',
         'cancelled'  => 'badge-red',
+    ][$status] ?? 'badge-grey';
+}
+
+/**
+ * Способ получения груза от отправителя: клиент привозит сам, или нужен
+ * выездной сбор курьером по адресу отправителя (from_address).
+ */
+function crm_pickup_type_label(?string $type): string
+{
+    return [
+        'self'    => 'Самостоятельно (клиент привозит сам)',
+        'courier' => 'Выездной сбор (курьер забирает по адресу)',
+    ][$type] ?? 'Самостоятельно (клиент привозит сам)';
+}
+
+function crm_pickup_type_class(?string $type): string
+{
+    return [
+        'self'    => 'badge-grey',
+        'courier' => 'badge-blue',
+    ][$type] ?? 'badge-grey';
+}
+
+/**
+ * Сборный рейс: группа заявок одного маршрута/даты, перевозимых вместе.
+ */
+function crm_shipment_run_status_label(string $status): string
+{
+    return [
+        'forming'    => 'Формируется',
+        'in_transit' => 'В пути',
+        'completed'  => 'Завершён',
+    ][$status] ?? $status;
+}
+
+function crm_shipment_run_status_class(string $status): string
+{
+    return [
+        'forming'    => 'badge-grey',
+        'in_transit' => 'badge-orange',
+        'completed'  => 'badge-green',
     ][$status] ?? 'badge-grey';
 }
 
