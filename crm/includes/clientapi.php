@@ -462,15 +462,18 @@ function capi_create_order_row(
     ?string $service = null,
     bool $isInsured = false,
     ?float $insuredAmount = null,
-    ?float $insuranceFee = null
+    ?float $insuranceFee = null,
+    ?string $recipientName = null,
+    ?string $recipientPhone = null
 ): array {
     $trackCode = capi_generate_track_code($pdo);
     $stmt = $pdo->prepare('INSERT INTO orders
-        (client_id, from_city, to_city, to_address, weight_kg, declared_value, price, comment, status, source, track_code, service,
+        (client_id, from_city, to_city, to_address, recipient_name, recipient_phone, weight_kg, declared_value, price, comment, status, source, track_code, service,
          is_insured, insured_amount, insurance_fee)
-        VALUES (?,?,?,?,?,?,?,?,\'new\',?,?,?,?,?,?)');
+        VALUES (?,?,?,?,?,?,?,?,?,?,\'new\',?,?,?,?,?,?)');
     $stmt->execute([
         $clientId, $fromCity ?: "\u{414}\u{435}\u{440}\u{431}\u{435}\u{43d}\u{442}", $toCity ?: "\u{421}\u{430}\u{43d}\u{43a}\u{442}-\u{41f}\u{435}\u{442}\u{435}\u{440}\u{431}\u{443}\u{440}\u{433}", $toAddress ?: null,
+        $recipientName ?: null, $recipientPhone ?: null,
         $weightKg, $declaredValue, $price, $comment ?: null, $source, $trackCode, $service,
         $isInsured ? 1 : 0, $insuredAmount, $insuranceFee,
     ]);

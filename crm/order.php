@@ -40,8 +40,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
         crm_flash_set("\u{412}\u{44b}\u{431}\u{435}\u{440}\u{438}\u{442}\u{435} \u{43a}\u{43b}\u{438}\u{435}\u{43d}\u{442}\u{430}.", 'err');
     } else {
         $stmt = $pdo->prepare('INSERT INTO orders
-            (client_id, created_by, from_city, to_city, from_address, to_address, cargo_description, weight_kg, places_count, declared_value, price, planned_date, comment, pickup_type, is_cod, cod_amount, is_insured, insured_amount, insurance_fee, status)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,\'new\')');
+            (client_id, created_by, from_city, to_city, from_address, to_address, recipient_name, recipient_phone, cargo_description, weight_kg, places_count, declared_value, price, planned_date, comment, pickup_type, is_cod, cod_amount, is_insured, insured_amount, insurance_fee, status)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,\'new\')');
         $stmt->execute([
             $clientId,
             $user['id'],
@@ -49,6 +49,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
             trim($_POST['to_city'] ?? '') ?: "\u{421}\u{430}\u{43d}\u{43a}\u{442}-\u{41f}\u{435}\u{442}\u{435}\u{440}\u{431}\u{443}\u{440}\u{433}",
             trim($_POST['from_address'] ?? '') ?: null,
             trim($_POST['to_address'] ?? '') ?: null,
+            trim($_POST['recipient_name'] ?? '') ?: null,
+            crm_phone_digits($_POST['recipient_phone'] ?? '') ?: null,
             trim($_POST['cargo_description'] ?? '') ?: null,
             $_POST['weight_kg'] !== '' ? (float) $_POST['weight_kg'] : null,
             $placesCount,
@@ -82,12 +84,14 @@ if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') 
     $isInsured = !empty($_POST['is_insured']) ? 1 : 0;
     $insuredAmount = $isInsured && $_POST['insured_amount'] !== '' ? (float) $_POST['insured_amount'] : null;
     $insuranceFee = $isInsured && $insuredAmount ? crm_insurance_fee($insuredAmount) : null;
-    $stmt = $pdo->prepare('UPDATE orders SET from_city=?, to_city=?, from_address=?, to_address=?, cargo_description=?, weight_kg=?, places_count=?, declared_value=?, price=?, planned_date=?, comment=?, pickup_type=?, is_cod=?, cod_amount=?, is_insured=?, insured_amount=?, insurance_fee=? WHERE id=?');
+    $stmt = $pdo->prepare('UPDATE orders SET from_city=?, to_city=?, from_address=?, to_address=?, recipient_name=?, recipient_phone=?, cargo_description=?, weight_kg=?, places_count=?, declared_value=?, price=?, planned_date=?, comment=?, pickup_type=?, is_cod=?, cod_amount=?, is_insured=?, insured_amount=?, insurance_fee=? WHERE id=?');
     $stmt->execute([
         trim($_POST['from_city'] ?? '') ?: "\u{414}\u{435}\u{440}\u{431}\u{435}\u{43d}\u{442}",
         trim($_POST['to_city'] ?? '') ?: "\u{421}\u{430}\u{43d}\u{43a}\u{442}-\u{41f}\u{435}\u{442}\u{435}\u{440}\u{431}\u{443}\u{440}\u{433}",
         trim($_POST['from_address'] ?? '') ?: null,
         trim($_POST['to_address'] ?? '') ?: null,
+        trim($_POST['recipient_name'] ?? '') ?: null,
+        crm_phone_digits($_POST['recipient_phone'] ?? '') ?: null,
         trim($_POST['cargo_description'] ?? '') ?: null,
         $_POST['weight_kg'] !== '' ? (float) $_POST['weight_kg'] : null,
         $placesCount,
@@ -394,6 +398,10 @@ require __DIR__ . '/includes/layout_top.php';
       <div><label>&#x410;&#x434;&#x440;&#x435;&#x441; &#x43e;&#x442;&#x43f;&#x440;&#x430;&#x432;&#x43b;&#x435;&#x43d;&#x438;&#x44f;</label><input type="text" name="from_address"></div>
       <div><label>&#x410;&#x434;&#x440;&#x435;&#x441; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x44f;</label><input type="text" name="to_address"></div>
     </div>
+    <div class="form-row">
+      <div><label>&#x418;&#x43c;&#x44f; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x430;&#x442;&#x435;&#x43b;&#x44f; (&#x43d;&#x435;&#x43e;&#x431;&#x44f;&#x437;&#x430;&#x442;&#x435;&#x43b;&#x44c;&#x43d;&#x43e;)</label><input type="text" name="recipient_name"></div>
+      <div><label>&#x422;&#x435;&#x43b;&#x435;&#x444;&#x43e;&#x43d; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x430;&#x442;&#x435;&#x43b;&#x44f; (&#x43d;&#x435;&#x43e;&#x431;&#x44f;&#x437;&#x430;&#x442;&#x435;&#x43b;&#x44c;&#x43d;&#x43e;)</label><input type="tel" name="recipient_phone" placeholder="+7 900 000-00-00"></div>
+    </div>
     <label>&#x421;&#x43f;&#x43e;&#x441;&#x43e;&#x431; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x44f; &#x433;&#x440;&#x443;&#x437;&#x430; &#x43e;&#x442; &#x43e;&#x442;&#x43f;&#x440;&#x430;&#x432;&#x438;&#x442;&#x435;&#x43b;&#x44f;</label>
     <select name="pickup_type">
       <option value="self">&#x421;&#x430;&#x43c;&#x43e;&#x441;&#x442;&#x43e;&#x44f;&#x442;&#x435;&#x43b;&#x44c;&#x43d;&#x43e; (&#x43a;&#x43b;&#x438;&#x435;&#x43d;&#x442; &#x43f;&#x440;&#x438;&#x432;&#x43e;&#x437;&#x438;&#x442; &#x441;&#x430;&#x43c;)</option>
@@ -568,6 +576,10 @@ require __DIR__ . '/includes/layout_top.php';
     <div class="form-row">
       <div><label>&#x410;&#x434;&#x440;&#x435;&#x441; &#x43e;&#x442;&#x43f;&#x440;&#x430;&#x432;&#x43b;&#x435;&#x43d;&#x438;&#x44f;</label><input type="text" name="from_address" value="<?= e($order['from_address']) ?>"></div>
       <div><label>&#x410;&#x434;&#x440;&#x435;&#x441; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x44f;</label><input type="text" name="to_address" value="<?= e($order['to_address']) ?>"></div>
+    </div>
+    <div class="form-row">
+      <div><label>&#x418;&#x43c;&#x44f; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x430;&#x442;&#x435;&#x43b;&#x44f; (&#x43d;&#x435;&#x43e;&#x431;&#x44f;&#x437;&#x430;&#x442;&#x435;&#x43b;&#x44c;&#x43d;&#x43e;)</label><input type="text" name="recipient_name" value="<?= e($order['recipient_name'] ?? '') ?>"></div>
+      <div><label>&#x422;&#x435;&#x43b;&#x435;&#x444;&#x43e;&#x43d; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x430;&#x442;&#x435;&#x43b;&#x44f; (&#x43d;&#x435;&#x43e;&#x431;&#x44f;&#x437;&#x430;&#x442;&#x435;&#x43b;&#x44c;&#x43d;&#x43e;)</label><input type="tel" name="recipient_phone" value="<?= e($order['recipient_phone'] ?? '') ?>" placeholder="+7 900 000-00-00"></div>
     </div>
     <label>&#x421;&#x43f;&#x43e;&#x441;&#x43e;&#x431; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x435;&#x43d;&#x438;&#x44f; &#x433;&#x440;&#x443;&#x437;&#x430; &#x43e;&#x442; &#x43e;&#x442;&#x43f;&#x440;&#x430;&#x432;&#x438;&#x442;&#x435;&#x43b;&#x44f;</label>
     <select name="pickup_type">

@@ -145,8 +145,8 @@ function wb_check(bool $on): string
     </div>
     <div class="col">
       <h4>&#x41f;&#x43e;&#x43b;&#x443;&#x447;&#x430;&#x442;&#x435;&#x43b;&#x44c;</h4>
-      <div class="field"><div class="lbl">&#x424;&#x418;&#x41e;</div><div class="val">&nbsp;</div></div>
-      <div class="field"><div class="lbl">&#x422;&#x435;&#x43b;&#x435;&#x444;&#x43e;&#x43d;</div><div class="val">&nbsp;</div></div>
+      <div class="field"><div class="lbl">&#x424;&#x418;&#x41e;</div><div class="val"><?= $order['recipient_name'] ? e($order['recipient_name']) : '&nbsp;' ?></div></div>
+      <div class="field"><div class="lbl">&#x422;&#x435;&#x43b;&#x435;&#x444;&#x43e;&#x43d;</div><div class="val"><?= $order['recipient_phone'] ? e($order['recipient_phone']) : '&nbsp;' ?></div></div>
       <div class="field"><div class="lbl">&#x413;&#x43e;&#x440;&#x43e;&#x434; / &#x430;&#x434;&#x440;&#x435;&#x441; &#x434;&#x43e;&#x441;&#x442;&#x430;&#x432;&#x43a;&#x438;</div><div class="val"><?= e($order['to_city']) ?><?= $order['to_address'] ? ', ' . e($order['to_address']) : '' ?></div></div>
     </div>
   </div>

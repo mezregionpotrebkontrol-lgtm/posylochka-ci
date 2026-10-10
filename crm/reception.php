@@ -44,6 +44,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'accep
     $fromCity = trim($_POST['from_city'] ?? '') ?: "\u{414}\u{435}\u{440}\u{431}\u{435}\u{43d}\u{442}";
     $toCity = trim($_POST['to_city'] ?? '') ?: "\u{421}\u{430}\u{43d}\u{43a}\u{442}-\u{41f}\u{435}\u{442}\u{435}\u{440}\u{431}\u{443}\u{440}\u{433}";
     $toAddress = trim($_POST['to_address'] ?? '') ?: null;
+    $recipientName = trim($_POST['recipient_name'] ?? '') ?: null;
+    $recipientPhone = crm_phone_digits($_POST['recipient_phone'] ?? '') ?: null;
     $weight = $_POST['weight_kg'] !== '' ? (float) str_replace(',', '.', $_POST['weight_kg']) : 0.0;
     $placesCount = max(1, (int) ($_POST['places_count'] ?? 1));
     $cargoDescription = trim($_POST['cargo_description'] ?? '') ?: null;
@@ -87,7 +89,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'accep
                 $pdo, $clientId, $fromCity, $toCity, $toAddress,
                 $weight, $isInsured && $insuredAmount > 0 ? $insuredAmount : null, (float) $totals['total'],
                 $fullComment, 'reception', null,
-                $isInsured && $insuredAmount > 0, $isInsured && $insuredAmount > 0 ? $insuredAmount : null, $insuranceFee
+                $isInsured && $insuredAmount > 0, $isInsured && $insuredAmount > 0 ? $insuredAmount : null, $insuranceFee,
+                $recipientName, $recipientPhone
             );
 
             $pdo->prepare('UPDATE orders SET places_count = ?, cargo_description = ?, status = ? WHERE id = ?')
@@ -246,6 +249,17 @@ require __DIR__ . '/includes/layout_top.php';
 
       <div class="form-row">
         <div>
+          <label>&#x418;&#x43c;&#x44f; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x430;&#x442;&#x435;&#x43b;&#x44f; (&#x43d;&#x435;&#x43e;&#x431;&#x44f;&#x437;&#x430;&#x442;&#x435;&#x43b;&#x44c;&#x43d;&#x43e;)</label>
+          <input type="text" name="recipient_name">
+        </div>
+        <div>
+          <label>&#x422;&#x435;&#x43b;&#x435;&#x444;&#x43e;&#x43d; &#x43f;&#x43e;&#x43b;&#x443;&#x447;&#x430;&#x442;&#x435;&#x43b;&#x44f; (&#x43d;&#x435;&#x43e;&#x431;&#x44f;&#x437;&#x430;&#x442;&#x435;&#x43b;&#x44c;&#x43d;&#x43e;)</label>
+          <input type="tel" name="recipient_phone" placeholder="+7 900 000-00-00">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div>
           <label>&#x412;&#x435;&#x441; &#x433;&#x440;&#x443;&#x437;&#x430;, &#x43a;&#x433;</label>
           <input type="number" step="0.01" name="weight_kg" id="r-weight" required>
         </div>
@@ -379,6 +393,9 @@ require __DIR__ . '/includes/layout_top.php';
           <h3 style="margin:0 0 6px;">&#x417;&#x430;&#x44f;&#x432;&#x43a;&#x430; &#x2116;<?= (int) $o['id'] ?> <span class="badge <?= crm_order_status_class($o['status']) ?>"><?= e(crm_order_status_label($o['status'])) ?></span></h3>
           <div><?= e($o['client_name']) ?> &#x2014; <?= e($o['client_phone']) ?></div>
           <div class="text-muted"><?= e($o['from_city']) ?> &#x2192; <?= e($o['to_city']) ?><?= $o['to_address'] ? ', ' . e($o['to_address']) : '' ?></div>
+          <?php if (!empty($o['recipient_name']) || !empty($o['recipient_phone'])): ?>
+          <div class="text-muted">&#x41f;&#x43e;&#x43b;&#x443;&#x447;&#x430;&#x442;&#x435;&#x43b;&#x44c;: <?= e($o['recipient_name'] ?: "\u{2014}") ?><?= $o['recipient_phone'] ? ' ' . "\u{2014}" . ' ' . e($o['recipient_phone']) : '' ?></div>
+          <?php endif; ?>
           <div class="text-muted">
             &#x412;&#x435;&#x441;: <?= $o['weight_kg'] !== null ? e(rtrim(rtrim(number_format((float) $o['weight_kg'], 2, '.', ''), '0'), '.')) : '&#x2014;' ?> &#x43a;&#x433;
             &#xb7; &#x41c;&#x435;&#x441;&#x442;: <?= (int) $o['places_count'] ?>
