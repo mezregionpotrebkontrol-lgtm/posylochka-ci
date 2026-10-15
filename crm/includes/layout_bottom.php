@@ -10,6 +10,7 @@
 .crm-toast{background:#fff;border-left:4px solid var(--brand,#0a2472);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:12px 14px;font-size:.88rem;color:#1c2438;cursor:pointer;animation:crmToastIn .25s ease;}
 .crm-toast.new_order{border-left-color:#1a7f37;}
 .crm-toast.status_change{border-left-color:#0a2472;}
+.crm-toast.new_lead{border-left-color:#c77c11;}
 .crm-toast b{display:block;margin-bottom:2px;font-size:.78rem;text-transform:uppercase;letter-spacing:.03em;color:#6b7490;}
 @keyframes crmToastIn{from{opacity:0;transform:translateX(20px);}to{opacity:1;transform:translateX(0);}}
 .crm-toast.crm-toast-out{animation:crmToastOut .2s ease forwards;}
@@ -61,10 +62,15 @@
     var wrap = document.getElementById('crmNotifyWrap');
     var el = document.createElement('div');
     el.className = 'crm-toast ' + ev.type;
-    var label = ev.type === 'new_order' ? '\u041d\u043e\u0432\u0430\u044f \u0437\u0430\u044f\u0432\u043a\u0430' : '\u0421\u043c\u0435\u043d\u0430 \u0441\u0442\u0430\u0442\u0443\u0441\u0430';
+    var label = '\u0421\u043c\u0435\u043d\u0430 \u0441\u0442\u0430\u0442\u0443\u0441\u0430';
+    if (ev.type === 'new_order') {
+      label = '\u041d\u043e\u0432\u0430\u044f \u0437\u0430\u044f\u0432\u043a\u0430';
+    } else if (ev.type === 'new_lead') {
+      label = '\u041d\u043e\u0432\u0430\u044f \u0437\u0430\u044f\u0432\u043a\u0430 \u0441 \u0441\u0430\u0439\u0442\u0430';
+    }
     el.innerHTML = '<b>' + label + '</b>' + ev.text.replace(/</g, '&lt;');
     el.addEventListener('click', function(){
-      window.location.href = '/crm/order.php?id=' + ev.order_id;
+      window.location.href = ev.order_id ? ('/crm/order.php?id=' + ev.order_id) : '/crm/leads.php';
     });
     wrap.appendChild(el);
     setTimeout(function(){
