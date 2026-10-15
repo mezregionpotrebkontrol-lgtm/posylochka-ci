@@ -197,3 +197,42 @@ function crm_notify_client_status(PDO $pdo, array $order, string $newStatus): vo
         crm_max_log("\u{418}\u{441}\u{43a}\u{43b}\u{44e}\u{447}\u{435}\u{43d}\u{438}\u{435} \u{432} crm_notify_client_status: " . $e->getMessage());
     }
 }
+
+/**
+ * &#x423;&#x432;&#x435;&#x434;&#x43e;&#x43c;&#x43b;&#x44f;&#x435;&#x442; &#x43a;&#x43b;&#x438;&#x435;&#x43d;&#x442;&#x430; &#x432; &#x43e;&#x442;&#x432;&#x435;&#x442; &#x43d;&#x430; &#x43f;&#x440;&#x43e;&#x441;&#x442;&#x443;&#x44e; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x443;/&#x437;&#x430;&#x44f;&#x432;&#x43a;&#x443;-&#x43b;&#x438;&#x434; &#x441; &#x441;&#x430;&#x439;&#x442;&#x430;, &#x433;&#x434;&#x435; &#x435;&#x449;&#x451;
+ * &#x43d;&#x435;&#x442; &#x43f;&#x43e;&#x43b;&#x43d;&#x43e;&#x446;&#x435;&#x43d;&#x43d;&#x43e;&#x433;&#x43e; &#x437;&#x430;&#x43a;&#x430;&#x437;&#x430; &#x441; client_id (&#x444;&#x43e;&#x440;&#x43c;&#x44b; "&#x43b;&#x435;&#x43d;&#x434;&#x438;&#x43d;&#x433;", B2B-&#x437;&#x430;&#x44f;&#x432;&#x43a;&#x430;) --
+ * &#x432; &#x43e;&#x442;&#x43b;&#x438;&#x447;&#x438;&#x435; &#x43e;&#x442; crm_notify_client_status() &#x440;&#x430;&#x431;&#x43e;&#x442;&#x430;&#x435;&#x442; &#x43f;&#x440;&#x44f;&#x43c;&#x43e; &#x43f;&#x43e; &#x43d;&#x43e;&#x43c;&#x435;&#x440;&#x443; &#x442;&#x435;&#x43b;&#x435;&#x444;&#x43e;&#x43d;&#x430;
+ * &#x438; (&#x43e;&#x43f;&#x446;&#x438;&#x43e;&#x43d;&#x430;&#x43b;&#x44c;&#x43d;&#x43e;) email, &#x431;&#x435;&#x437; &#x43e;&#x431;&#x440;&#x430;&#x449;&#x435;&#x43d;&#x438;&#x44f; &#x43a; &#x442;&#x430;&#x431;&#x43b;&#x438;&#x446;&#x435; orders.
+ */
+function crm_notify_client_lead(PDO $pdo, string $phone, string $text, ?string $email = null): void
+{
+    try {
+        $chatId = crm_phone_to_chat_id($phone);
+        if ($chatId) {
+            crm_send_max_message($chatId, $text);
+            crm_send_whatsapp_message($chatId, $text);
+            crm_send_telegram_message($chatId, $text);
+        }
+
+        if (!function_exists('crm_send_email')) {
+            return;
+        }
+
+        if ($email === null || $email === '') {
+            $digits = crm_phone_digits($phone);
+            if ($digits) {
+                $stmt = $pdo->prepare("SELECT email FROM clients WHERE phone = ? AND email IS NOT NULL AND email <> '' LIMIT 1");
+                $stmt->execute([$digits]);
+                $found = $stmt->fetchColumn();
+                $email = $found !== false ? $found : null;
+            }
+        }
+        if ($email) {
+            $cfg = crm_config();
+            $companyName = $cfg['company_name'] ?? "\u{41f}\u{43e}\u{441}\u{44b}\u{43b}\u{43e}\u{447}\u{43a}\u{430}";
+            crm_send_email($email, "\u{412}\u{430}\u{448}\u{430} \u{437}\u{430}\u{44f}\u{432}\u{43a}\u{430} \u{43f}\u{440}\u{438}\u{43d}\u{44f}\u{442}\u{430} -- " . $companyName, $text);
+        }
+    } catch (Throwable $e) {
+        crm_max_log("\u{418}\u{441}\u{43a}\u{43b}\u{44e}\u{447}\u{435}\u{43d}\u{438}\u{435} \u{432} crm_notify_client_lead: " . $e->getMessage());
+    }
+}

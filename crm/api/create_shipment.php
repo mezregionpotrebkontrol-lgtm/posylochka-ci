@@ -45,4 +45,12 @@ $clientId = capi_find_or_create_client($pdo, $name, $phoneDigits);
 crm_notify_owner("\u{41d}\u{43e}\u{432}\u{430}\u{44f} \u{437}\u{430}\u{44f}\u{432}\u{43a}\u{430} \u{2116}{$orderId} \u{441} \u{441}\u{430}\u{439}\u{442}\u{430} (\u{431}\u{435}\u{437} \u{43e}\u{43d}\u{43b}\u{430}\u{439}\u{43d}-\u{43e}\u{43f}\u{43b}\u{430}\u{442}\u{44b}): {$originCity} \u{2192} {$destCity}"
     . ($weightRaw !== '' ? ", {$weightRaw}" : '') . ". \u{422}\u{435}\u{43b}\u{435}\u{444}\u{43e}\u{43d}: +{$phoneDigits}. \u{422}\u{440}\u{435}\u{43a}: {$trackCode}.");
 
+// &#x423;&#x432;&#x435;&#x434;&#x43e;&#x43c;&#x43b;&#x44f;&#x435;&#x43c; &#x441;&#x430;&#x43c;&#x43e;&#x433;&#x43e; &#x43a;&#x43b;&#x438;&#x435;&#x43d;&#x442;&#x430; &#x43f;&#x43e; &#x432;&#x441;&#x435;&#x43c; &#x43a;&#x430;&#x43d;&#x430;&#x43b;&#x430;&#x43c; (&#x442;&#x430;&#x43a;&#x436;&#x435; &#x43a;&#x430;&#x43a; &#x432; create_order.php) -- &#x440;&#x430;&#x43d;&#x44c;&#x448;&#x435; &#x44d;&#x442;&#x43e;&#x442; &#x437;&#x430;&#x43a;&#x430;&#x437; (&#x431;&#x435;&#x437; &#x43e;&#x43d;&#x43b;&#x430;&#x439;&#x43d;-&#x43e;&#x43f;&#x43b;&#x430;&#x442;&#x44b;) &#x441;&#x441;&#x44b;&#x43b;&#x430;&#x43b;&#x441;&#x44f; &#x442;&#x43e;&#x43b;&#x44c;&#x43a;&#x43e; &#x432;&#x43b;&#x430;&#x434;&#x435;&#x43b;&#x44c;&#x446;&#x443;.
+crm_notify_client_status($pdo, [
+    'id'        => $orderId,
+    'from_city' => $originCity,
+    'to_city'   => $destCity,
+    'client_id' => $clientId,
+], 'new');
+
 capi_respond(['ok' => true, 'track' => $trackCode]);
