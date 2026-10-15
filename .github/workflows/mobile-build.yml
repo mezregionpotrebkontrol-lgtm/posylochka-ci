@@ -81,6 +81,8 @@ jobs:
     name: Android (signed release APK for RuStore / Google Play)
     runs-on: ubuntu-latest
     if: ${{ vars.HAS_ANDROID_SIGNING == 'true' }}
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: mobile-app
