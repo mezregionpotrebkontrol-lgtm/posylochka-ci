@@ -157,6 +157,23 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew assembleRelease --no-daemon
 
+      - name: Publish signed APK to apk-releases branch (so it can be fetched via GitHub API)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          apk=$(find android/app/build/outputs/apk/release -name '*.apk' | head -1)
+          cp "$apk" /tmp/posylochka-release.apk
+          rm -rf /tmp/apk-pub
+          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" /tmp/apk-pub
+          cd /tmp/apk-pub
+          git checkout apk-releases 2>/dev/null || git checkout --orphan apk-releases
+          git rm -rf . >/dev/null 2>&1 || true
+          cp /tmp/posylochka-release.apk ./posylochka-release.apk
+          git add posylochka-release.apk
+          git -c user.name="CI Bot" -c user.email="ci@posylochka.local" commit -m "Signed release APK (${{ github.sha }})" --allow-empty
+          git push origin apk-releases --force
+
       - name: Upload signed release APK
         uses: actions/upload-artifact@v4
         with:
