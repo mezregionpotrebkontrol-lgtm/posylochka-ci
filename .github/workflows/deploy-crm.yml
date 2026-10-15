@@ -1,4 +1,4 @@
-name: Deploy CRM to hosting (SFTP)
+name: Deploy CRM to hosting (FTP)
 
 'on':
   push:
@@ -10,7 +10,7 @@ name: Deploy CRM to hosting (SFTP)
 
 jobs:
   deploy:
-    name: Upload crm/ to server over SFTP
+    name: Upload crm/ to server over FTP
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,14 +25,15 @@ jobs:
           # never let a deploy overwrite it.
           rm -f deploy_crm/config.php
 
-      - name: Upload crm/ via SCP/SFTP
-        uses: appleboy/scp-action@v0.1.7
+      - name: Upload crm/ via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          server: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USERNAME }}
           password: ${{ secrets.DEPLOY_PASSWORD }}
-          source: 'deploy_crm/*'
-          target: ${{ secrets.DEPLOY_REMOTE_PATH }}
-          strip_components: 1
-          overwrite: true
+          port: ${{ secrets.DEPLOY_PORT || 21 }}
+          protocol: ftp
+          local-dir: ./deploy_crm/
+          server-dir: ${{ secrets.DEPLOY_REMOTE_PATH }}/
+          exclude: |
+            **/config.php
