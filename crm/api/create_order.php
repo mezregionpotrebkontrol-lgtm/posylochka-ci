@@ -91,4 +91,15 @@ $pdo->prepare('INSERT INTO yookassa_payments (order_id, yk_payment_id, amount, c
 
 crm_notify_owner("\u{41d}\u{43e}\u{432}\u{430}\u{44f} \u{437}\u{430}\u{44f}\u{432}\u{43a}\u{430} \u{2116}{$orderId} \u{441} \u{441}\u{430}\u{439}\u{442}\u{430} (\u{43e}\u{43f}\u{43b}\u{430}\u{442}\u{430} \u{43e}\u{43d}\u{43b}\u{430}\u{439}\u{43d}): {$originCity} \u{2192} {$destCity}, {$weight} \u{43a}\u{433}, {$totals['total']} \u{20bd}. \u{422}\u{440}\u{435}\u{43a}: {$trackCode}.");
 
+// &#x423;&#x432;&#x435;&#x434;&#x43e;&#x43c;&#x43b;&#x44f;&#x435;&#x43c; &#x441;&#x430;&#x43c;&#x43e;&#x433;&#x43e; &#x43a;&#x43b;&#x438;&#x435;&#x43d;&#x442;&#x430;/&#x43e;&#x442;&#x43f;&#x440;&#x430;&#x432;&#x438;&#x442;&#x435;&#x43b;&#x44f; &#x43e; &#x43f;&#x440;&#x438;&#x451;&#x43c;&#x435; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x438; &#x441;&#x440;&#x430;&#x437;&#x443; &#x43f;&#x43e; &#x432;&#x441;&#x435;&#x43c;
+// &#x43d;&#x430;&#x441;&#x442;&#x440;&#x43e;&#x435;&#x43d;&#x43d;&#x44b;&#x43c; &#x43a;&#x430;&#x43d;&#x430;&#x43b;&#x430;&#x43c; (MAX, WhatsApp, Telegram, email), &#x447;&#x442;&#x43e; &#x437;&#x430;&#x43a;&#x440;&#x44b;&#x432;&#x430;&#x435;&#x442;
+// &#x43f;&#x440;&#x43e;&#x431;&#x435;&#x43b; &#x438;&#x437; &#x437;&#x430;&#x434;&#x430;&#x447;&#x438; "&#x43e;&#x442;&#x43f;&#x440;&#x430;&#x432;&#x438;&#x442;&#x435;&#x43b;&#x44e; &#x43d;&#x438;&#x447;&#x435;&#x433;&#x43e; &#x43d;&#x435; &#x43f;&#x440;&#x438;&#x445;&#x43e;&#x434;&#x438;&#x442;" -- &#x440;&#x430;&#x43d;&#x44c;&#x448;&#x435; &#x432;&#x44b;&#x437;&#x44b;&#x432;&#x430;&#x43b;&#x441;&#x44f;
+// &#x442;&#x43e;&#x43b;&#x44c;&#x43a;&#x43e; &#x43f;&#x440;&#x438; &#x441;&#x43c;&#x435;&#x43d;&#x435; &#x441;&#x442;&#x430;&#x442;&#x443;&#x441;&#x430;, &#x43d;&#x438;&#x43a;&#x43e;&#x433;&#x434;&#x430; &#x43d;&#x430; &#x441;&#x430;&#x43c;&#x43e;&#x43c; &#x43e;&#x444;&#x43e;&#x440;&#x43c;&#x43b;&#x435;&#x43d;&#x438;&#x438;.
+crm_notify_client_status($pdo, [
+    'id'        => $orderId,
+    'from_city' => $originCity,
+    'to_city'   => $destCity,
+    'client_id' => $clientId,
+], 'new');
+
 capi_respond(['ok' => true, 'confirmation_url' => $payment['confirmation']['confirmation_url'], 'track' => $trackCode]);
