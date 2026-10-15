@@ -16,7 +16,7 @@ $companyName = crm_config()['company_name'] ?? "\u{41f}\u{43e}\u{441}\u{44b}\u{4
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="stylesheet" href="/crm/assets/style.css">
 </head>
-<body>
+<body data-auto-refresh="<?= in_array($activeNav ?? '', ['dashboard', 'orders', 'leads'], true) ? '1' : '0' ?>">
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><img src="/crm/assets/logo.png" alt="<?= e($companyName) ?>"> <span><?= e($companyName) ?></span></div>
