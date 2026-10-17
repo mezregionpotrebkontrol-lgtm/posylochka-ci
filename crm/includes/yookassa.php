@@ -110,16 +110,32 @@ function crm_yookassa_create_payment(
     if ($customerEmail) {
         $customer['email'] = $customerEmail;
     }
+    $ykCfg = crm_yookassa_config();
+    if (!$customer) {
+        // 54-ФЗ: чек нужен всегда. Если у клиента нет ни телефона, ни email,
+        // чек уходит на почту магазина (receipt_fallback_email или owner_email),
+        // а не платёж падает с ошибкой "Receipt is missing".
+        $fallback = $ykCfg['receipt_fallback_email'] ?? (crm_config()['mail']['owner_email'] ?? '');
+        if ($fallback !== '' && filter_var($fallback, FILTER_VALIDATE_EMAIL)) {
+            $customer['email'] = $fallback;
+        }
+    }
     if ($customer) {
-        // vat_code: 1 = без НДС (УСН). Если у вас другая система налогообложения —
-        // скажите, какая, поправим код.
-        $body['receipt'] = [
+        // vat_code берётся из config.php ('yookassa' => ['vat_code' => ...]).
+        // 1 = без НДС (УСН/патент — по умолчанию). Для УСН с НДС с 2025 г.:
+        // 7 = НДС 5%, 8 = НДС 7%; ОСНО: 4 = НДС 20%.
+        // tax_system_code (необязательно): 2 = УСН доходы, 3 = УСН доходы-расходы, 6 = патент.
+        $body['receipt'] = [];
+        if (!empty($ykCfg['tax_system_code'])) {
+            $body['receipt']['tax_system_code'] = (int) $ykCfg['tax_system_code'];
+        }
+        $body['receipt'] += [
             'customer' => $customer,
             'items'    => [[
                 'description'    => mb_substr($description, 0, 128),
                 'quantity'       => '1.00',
                 'amount'         => ['value' => number_format($amount, 2, '.', ''), 'currency' => 'RUB'],
-                'vat_code'       => 1,
+                'vat_code'       => (int) ($ykCfg['vat_code'] ?? 1),
                 'payment_subject' => 'service',
                 'payment_mode'    => 'full_payment',
             ]],
