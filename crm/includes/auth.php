@@ -56,6 +56,9 @@ function crm_login(string $login, string $password): bool
     $user = $stmt->fetch();
 
     if (!$user || !password_verify($password, $user['password_hash'])) {
+        if (function_exists('crm_audit')) {
+            crm_audit('login_failed', 'users', $user ? (int) $user['id'] : null, 'логин: ' . mb_substr($login, 0, 100));
+        }
         return false;
     }
 
@@ -67,12 +70,18 @@ function crm_login(string $login, string $password): bool
         'login' => $user['login'],
         'role'  => $user['role'],
     ];
+    if (function_exists('crm_audit')) {
+        crm_audit('login', 'users', (int) $user['id'], null, $_SESSION['user']);
+    }
     return true;
 }
 
 function crm_logout(): void
 {
     crm_start_session();
+    if (function_exists('crm_audit') && !empty($_SESSION['user'])) {
+        crm_audit('logout', 'users', (int) $_SESSION['user']['id'], null, $_SESSION['user']);
+    }
     $_SESSION = [];
     session_destroy();
 }
@@ -99,6 +108,9 @@ function crm_csrf_check(): void
     if (empty($_SESSION['csrf']) || !hash_equals($_SESSION['csrf'], $sent)) {
         http_response_code(400);
         die('Сессия устарела, обновите страницу и попробуйте снова.');
+    }
+    if (function_exists('crm_audit_post')) {
+        crm_audit_post();
     }
 }
 

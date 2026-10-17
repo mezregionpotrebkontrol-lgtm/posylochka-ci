@@ -13,6 +13,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($login === '' || $password === '') {
         $error = 'Введите логин и пароль.';
+    } elseif (crm_failed_logins_recent(15) >= 8) {
+        $error = 'Слишком много неудачных попыток входа. Подождите 15 минут.';
     } elseif (crm_login($login, $password)) {
         crm_redirect('/crm/index.php');
     } else {

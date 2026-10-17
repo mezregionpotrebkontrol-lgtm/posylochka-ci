@@ -503,3 +503,35 @@ function crm_notify_owner(string $text): void
         crm_send_email($ownerEmail, $subject, $text);
     }
 }
+
+/* ======================================================================
+ * Согласие на обработку персональных данных (152-ФЗ)
+ * ====================================================================== */
+
+/**
+ * Если в config.php включено 'require_pd_consent' => true, формы сайта без
+ * галочки согласия (поле "consent" в запросе) отклоняются. По умолчанию
+ * выключено, чтобы не сломать формы, где галочки ещё нет: включайте после
+ * того, как галочка появится на всех формах сайта.
+ */
+function capi_consent_gate(array $payload): void
+{
+    $cfg = crm_config();
+    if (!empty($cfg['require_pd_consent']) && empty($payload['consent'])) {
+        capi_error('Нужно подтвердить согласие на обработку персональных данных.');
+    }
+}
+
+/** Запоминает у клиента, когда и через какую форму дано согласие (миграция 013). */
+function capi_record_consent(PDO $pdo, int $clientId, string $source, array $payload): void
+{
+    if (empty($payload['consent'])) {
+        return;
+    }
+    try {
+        $pdo->prepare('UPDATE clients SET pd_consent_at = NOW(), pd_consent_source = ? WHERE id = ?')
+            ->execute([mb_substr($source, 0, 60), $clientId]);
+    } catch (Throwable $e) {
+        // Миграция 013 ещё не применена — не мешаем оформлению заказа.
+    }
+}

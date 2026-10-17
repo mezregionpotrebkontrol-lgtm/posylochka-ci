@@ -7,6 +7,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 }
 
 $payload = capi_json_input();
+capi_consent_gate($payload);
 $name = trim((string) ($payload['name'] ?? ''));
 $phone = trim((string) ($payload['phone'] ?? ''));
 $city = trim((string) ($payload['city'] ?? ''));

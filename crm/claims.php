@@ -25,17 +25,29 @@ if ($search !== '') {
     $params[] = ctype_digit($search) ? (int) $search : 0;
 }
 
-$sql = 'SELECT cl.*, o.from_city, o.to_city, c.name AS client_name, c.id AS client_id
-        FROM claims cl
+$fromSql = ' FROM claims cl
         JOIN orders o ON o.id = cl.order_id
         JOIN clients c ON c.id = o.client_id';
-if ($where) {
-    $sql .= ' WHERE ' . implode(' AND ', $where);
-}
-$sql .= ' ORDER BY cl.created_at DESC LIMIT 300';
+$whereSql = $where ? ' WHERE ' . implode(' AND ', $where) : '';
+$pg = crm_paginate($pdo, 'SELECT COUNT(*)' . $fromSql . $whereSql, $params);
+$sql = 'SELECT cl.*, o.from_city, o.to_city, c.name AS client_name, c.id AS client_id, c.phone AS client_phone'
+    . $fromSql . $whereSql . ' ORDER BY cl.created_at DESC' . crm_limit_sql($pg);
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $claims = $stmt->fetchAll();
+
+if (crm_is_export()) {
+    $rows = [];
+    foreach ($claims as $cl) {
+        $rows[] = [
+            $cl['id'], $cl['order_id'], crm_date($cl['created_at'], 'd.m.Y'), $cl['client_name'], $cl['client_phone'],
+            $cl['from_city'] . ' → ' . $cl['to_city'], crm_claim_reason_label($cl['reason']), crm_claim_status_label($cl['status']),
+            crm_csv_num($cl['compensation_amount']), $cl['response_due_date'] ? crm_date($cl['response_due_date'], 'd.m.Y') : '',
+            $cl['resolved_at'] ? crm_date($cl['resolved_at'], 'd.m.Y') : '', $cl['description'],
+        ];
+    }
+    crm_csv_download('pretenzii', ['№', '№ заявки', 'Создана', 'Клиент', 'Телефон', 'Маршрут', 'Причина', 'Статус', 'Компенсация, ₽', 'Срок ответа', 'Решена', 'Описание'], $rows);
+}
 
 $totals = $pdo->query("SELECT
     COUNT(CASE WHEN status IN ('open','in_progress') THEN 1 END) AS open_cnt,
@@ -78,6 +90,7 @@ require __DIR__ . '/includes/layout_top.php';
     </div>
     <button class="btn secondary" type="submit">Применить</button>
     <?php if ($search !== '' || $statusFilter !== '' || $reasonFilter !== ''): ?><a class="btn secondary" href="/crm/claims.php">Сбросить</a><?php endif; ?>
+    <span style="margin-left:auto;"><?= crm_export_button() ?></span>
   </form>
 </div>
 
@@ -103,6 +116,7 @@ require __DIR__ . '/includes/layout_top.php';
       <?php endforeach; ?>
     </tbody>
   </table>
+  <?= crm_pagination_html($pg) ?>
   <?php endif; ?>
 </div>
 

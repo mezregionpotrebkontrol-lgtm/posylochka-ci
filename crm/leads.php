@@ -58,8 +58,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'conve
     crm_redirect('/crm/leads.php');
 }
 
-$orderRequests = $pdo->query('SELECT * FROM site_order_requests ORDER BY created_at DESC LIMIT 100')->fetchAll();
-$businessRequests = $pdo->query('SELECT * FROM business_requests ORDER BY created_at DESC LIMIT 100')->fetchAll();
+// Две независимые таблицы — у каждой свой номер страницы (page и bpage).
+$exportWhat = $_GET['what'] ?? 'orders';
+$pgO = crm_paginate($pdo, 'SELECT COUNT(*) FROM site_order_requests', [], CRM_PER_PAGE, 'page');
+$pgB = crm_paginate($pdo, 'SELECT COUNT(*) FROM business_requests', [], CRM_PER_PAGE, 'bpage');
+$orderRequests = $pdo->query('SELECT * FROM site_order_requests ORDER BY created_at DESC' . crm_limit_sql($pgO))->fetchAll();
+$businessRequests = $pdo->query('SELECT * FROM business_requests ORDER BY created_at DESC' . crm_limit_sql($pgB))->fetchAll();
+
+if (crm_is_export()) {
+    if ($exportWhat === 'b2b') {
+        $rows = [];
+        foreach ($businessRequests as $r) {
+            $rows[] = [crm_date($r['created_at']), $r['company'], $r['name'], $r['phone'], $r['email'] ?? '', $r['volume'] ?? '', $r['cities'] ?? '', $r['comment'] ?? ''];
+        }
+        crm_csv_download('zayavki_b2b', ['Когда', 'Организация', 'Контакт', 'Телефон', 'Email', 'Объём', 'Города', 'Комментарий'], $rows);
+    }
+    $rows = [];
+    foreach ($orderRequests as $r) {
+        $rows[] = [crm_date($r['created_at']), $r['name'], $r['phone'], $r['city'] ?? '', $r['dest_city'] ?? '', $r['weight'] ?? '', $r['comment'] ?? '', $r['converted_order_id'] ?? ''];
+    }
+    crm_csv_download('zayavki_s_saita', ['Когда', 'Имя', 'Телефон', 'Откуда', 'Куда', 'Вес', 'Комментарий', '№ заявки в CRM'], $rows);
+}
 
 $pageTitle = "\u{417}\u{430}\u{44f}\u{432}\u{43a}\u{438} \u{441} \u{441}\u{430}\u{439}\u{442}\u{430}";
 $activeNav = 'leads';
@@ -67,7 +86,8 @@ require __DIR__ . '/includes/layout_top.php';
 ?>
 
 <div class="card">
-  <h3 style="margin-top:0;">&#x417;&#x430;&#x44f;&#x432;&#x43a;&#x438; &#x43d;&#x430; &#x434;&#x43e;&#x441;&#x442;&#x430;&#x432;&#x43a;&#x443; &#x441; &#x43b;&#x435;&#x43d;&#x434;&#x438;&#x43d;&#x433;&#x430; (<?= count($orderRequests) ?>)</h3>
+  <h3 style="margin-top:0;">&#x417;&#x430;&#x44f;&#x432;&#x43a;&#x438; &#x43d;&#x430; &#x434;&#x43e;&#x441;&#x442;&#x430;&#x432;&#x43a;&#x443; &#x441; &#x43b;&#x435;&#x43d;&#x434;&#x438;&#x43d;&#x433;&#x430; (<?= (int) $pgO['total'] ?>)</h3>
+  <div style="margin-bottom:10px;"><a class="btn small secondary" href="<?= e(crm_url_with(['export' => 'csv', 'what' => 'orders', 'page' => null, 'bpage' => null])) ?>">⬇ Скачать в Excel</a></div>
   <?php if (!$orderRequests): ?>
     <div class="empty-state">&#x41f;&#x43e;&#x43a;&#x430; &#x43d;&#x435;&#x442; &#x437;&#x430;&#x44f;&#x432;&#x43e;&#x43a;.</div>
   <?php else: ?>
@@ -99,11 +119,13 @@ require __DIR__ . '/includes/layout_top.php';
         <?php endforeach; ?>
       </tbody>
     </table>
+    <?= crm_pagination_html($pgO) ?>
   <?php endif; ?>
 </div>
 
 <div class="card">
-  <h3 style="margin-top:0;">&#x417;&#x430;&#x44f;&#x432;&#x43a;&#x438; &#x43d;&#x430; &#x441;&#x43e;&#x442;&#x440;&#x443;&#x434;&#x43d;&#x438;&#x447;&#x435;&#x441;&#x442;&#x432;&#x43e; (B2B) (<?= count($businessRequests) ?>)</h3>
+  <h3 style="margin-top:0;">&#x417;&#x430;&#x44f;&#x432;&#x43a;&#x438; &#x43d;&#x430; &#x441;&#x43e;&#x442;&#x440;&#x443;&#x434;&#x43d;&#x438;&#x447;&#x435;&#x441;&#x442;&#x432;&#x43e; (B2B) (<?= (int) $pgB['total'] ?>)</h3>
+  <div style="margin-bottom:10px;"><a class="btn small secondary" href="<?= e(crm_url_with(['export' => 'csv', 'what' => 'b2b', 'page' => null, 'bpage' => null])) ?>">⬇ Скачать в Excel</a></div>
   <?php if (!$businessRequests): ?>
     <div class="empty-state">&#x41f;&#x43e;&#x43a;&#x430; &#x43d;&#x435;&#x442; &#x437;&#x430;&#x44f;&#x432;&#x43e;&#x43a;.</div>
   <?php else: ?>
@@ -123,6 +145,7 @@ require __DIR__ . '/includes/layout_top.php';
         <?php endforeach; ?>
       </tbody>
     </table>
+    <?= crm_pagination_html($pgB) ?>
   <?php endif; ?>
 </div>
 
