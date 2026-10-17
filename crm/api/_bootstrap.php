@@ -12,6 +12,7 @@ require_once __DIR__ . '/../includes/sms.php';
 require_once __DIR__ . '/../includes/email.php';
 require_once __DIR__ . '/../includes/yookassa.php';
 require_once __DIR__ . '/../includes/clientapi.php';
+require_once __DIR__ . '/../includes/promo.php';
 
 $crmConfig = crm_config();
 date_default_timezone_set($crmConfig['timezone'] ?? 'Europe/Moscow');

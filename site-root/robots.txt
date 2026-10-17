@@ -1,0 +1,13 @@
+# Посылочка — служба доставки Дербент — Санкт-Петербург
+User-agent: *
+Disallow: /crm/
+Disallow: /api/
+Disallow: /uploads/
+Disallow: /admin
+Disallow: /app.html
+Disallow: /reset-password.html
+Disallow: /*?paid_track=
+Disallow: /*?track=
+Allow: /
+
+Sitemap: https://xn----8sb3addmbbgv2e2b8b.xn--p1ai/sitemap.xml

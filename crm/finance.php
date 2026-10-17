@@ -10,15 +10,36 @@ if ($statusFilter !== '' && in_array($statusFilter, ['draft','sent','paid','canc
     $where[] = 'i.status = ?';
     $params[] = $statusFilter;
 }
-
-$sql = 'SELECT i.*, c.name AS client_name FROM invoices i JOIN clients c ON c.id = i.client_id';
-if ($where) {
-    $sql .= ' WHERE ' . implode(' AND ', $where);
+$dateFrom = preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['from'] ?? '') ? $_GET['from'] : '';
+$dateTo = preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['to'] ?? '') ? $_GET['to'] : '';
+if ($dateFrom !== '') {
+    $where[] = 'i.created_at >= ?';
+    $params[] = $dateFrom . ' 00:00:00';
 }
-$sql .= ' ORDER BY i.created_at DESC LIMIT 300';
+if ($dateTo !== '') {
+    $where[] = 'i.created_at <= ?';
+    $params[] = $dateTo . ' 23:59:59';
+}
+
+$fromSql = ' FROM invoices i JOIN clients c ON c.id = i.client_id';
+$whereSql = $where ? ' WHERE ' . implode(' AND ', $where) : '';
+$pg = crm_paginate($pdo, 'SELECT COUNT(*)' . $fromSql . $whereSql, $params);
+$sql = 'SELECT i.*, c.name AS client_name, c.inn AS client_inn' . $fromSql . $whereSql . ' ORDER BY i.created_at DESC' . crm_limit_sql($pg);
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $invoices = $stmt->fetchAll();
+
+if (crm_is_export()) {
+    $rows = [];
+    foreach ($invoices as $i) {
+        $rows[] = [
+            $i['number'], crm_date($i['created_at'], 'd.m.Y'), $i['client_name'], $i['client_inn'],
+            $i['order_id'], crm_csv_num($i['amount']), crm_invoice_status_label($i['status']),
+            $i['paid_at'] ? crm_date($i['paid_at'], 'd.m.Y') : '',
+        ];
+    }
+    crm_csv_download('scheta', ['№ счёта', 'Дата', 'Клиент', 'ИНН', '№ заявки', 'Сумма, ₽', 'Статус', 'Оплачен'], $rows);
+}
 
 $totals = $pdo->query("SELECT
     SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) AS paid_total,
@@ -47,9 +68,12 @@ require __DIR__ . '/includes/layout_top.php';
           <?php endforeach; ?>
         </select>
       </div>
+      <div class="field"><label>С</label><input type="date" name="from" value="<?= e($dateFrom) ?>"></div>
+      <div class="field"><label>По</label><input type="date" name="to" value="<?= e($dateTo) ?>"></div>
       <button class="btn secondary" type="submit">Применить</button>
     </form>
-    <a class="btn" href="/crm/invoice.php">+ Новый счёт</a>
+    <span style="display:flex;gap:8px;"><?= crm_export_button() ?>
+    <a class="btn" href="/crm/invoice.php">+ Новый счёт</a></span>
   </div>
 </div>
 
@@ -77,6 +101,7 @@ require __DIR__ . '/includes/layout_top.php';
       <?php endforeach; ?>
     </tbody>
   </table>
+  <?= crm_pagination_html($pg) ?>
   <?php endif; ?>
 </div>
 

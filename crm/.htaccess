@@ -1,20 +1,16 @@
 # Защита служебных файлов и папок CRM от прямого доступа через браузер
+Options -Indexes
 
+# config.php (пароли и ключи) и все журналы *.log (там телефоны клиентов,
+# ответы платёжной системы) — только для сервера, не для браузера.
 <IfModule mod_authz_core.c>
-    <Files "config.php">
+    <FilesMatch "^(config\.php|.*\.log|.*\.sql|.*\.sql\.gz)$">
         Require all denied
-    </Files>
-    <Files "max-notify.log">
-        Require all denied
-    </Files>
+    </FilesMatch>
 </IfModule>
 <IfModule !mod_authz_core.c>
-    <Files "config.php">
+    <FilesMatch "^(config\.php|.*\.log|.*\.sql|.*\.sql\.gz)$">
         Order allow,deny
         Deny from all
-    </Files>
-    <Files "max-notify.log">
-        Order allow,deny
-        Deny from all
-    </Files>
+    </FilesMatch>
 </IfModule>

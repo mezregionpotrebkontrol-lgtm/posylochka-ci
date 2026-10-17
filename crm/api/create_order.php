@@ -19,6 +19,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 }
 
 $payload = capi_json_input();
+capi_consent_gate($payload);
 
 $name = trim((string) ($payload['name'] ?? ''));
 $phoneDigits = crm_phone_digits($payload['phone'] ?? null);
@@ -51,6 +52,18 @@ if ($totals === null) {
     capi_error("\u{41d}\u{435} \u{443}\u{434}\u{430}\u{43b}\u{43e}\u{441}\u{44c} \u{440}\u{430}\u{441}\u{441}\u{447}\u{438}\u{442}\u{430}\u{442}\u{44c} \u{441}\u{442}\u{43e}\u{438}\u{43c}\u{43e}\u{441}\u{442}\u{44c} \u{2014} \u{43f}\u{440}\u{43e}\u{432}\u{435}\u{440}\u{44c}\u{442}\u{435} \u{433}\u{43e}\u{440}\u{43e}\u{434}\u{430} (\u{432}\u{44b}\u{431}\u{435}\u{440}\u{438}\u{442}\u{435} \u{438}\u{437} \u{43f}\u{43e}\u{434}\u{441}\u{43a}\u{430}\u{437}\u{43e}\u{43a}) \u{438} \u{432}\u{435}\u{441}.");
 }
 
+// Промокод (необязательно): скидка пересчитывается на сервере, сумме из браузера не доверяем.
+$promo = null;
+$discount = 0.0;
+$promoCode = crm_promo_normalize($payload['promo_code'] ?? '');
+if ($promoCode !== '') {
+    [$promo, $discount, $promoErr] = crm_promo_check($pdo, $promoCode, (float) $totals['total']);
+    if ($promoErr !== null) {
+        capi_error($promoErr);
+    }
+    $totals['total'] = round((float) $totals['total'] - $discount, 2);
+}
+
 if (capi_order_rate_limited($pdo, $phoneDigits)) {
     capi_error("\u{421}\u{43b}\u{438}\u{448}\u{43a}\u{43e}\u{43c} \u{43c}\u{43d}\u{43e}\u{433}\u{43e} \u{437}\u{430}\u{44f}\u{432}\u{43e}\u{43a} \u{441} \u{44d}\u{442}\u{43e}\u{433}\u{43e} \u{43d}\u{43e}\u{43c}\u{435}\u{440}\u{430} \u{437}\u{430} \u{43f}\u{43e}\u{441}\u{43b}\u{435}\u{434}\u{43d}\u{438}\u{435} 10 \u{43c}\u{438}\u{43d}\u{443}\u{442}. \u{41f}\u{43e}\u{43f}\u{440}\u{43e}\u{431}\u{443}\u{439}\u{442}\u{435} \u{43f}\u{43e}\u{437}\u{436}\u{435} \u{438}\u{43b}\u{438} \u{43f}\u{43e}\u{437}\u{432}\u{43e}\u{43d}\u{438}\u{442}\u{435} \u{43d}\u{430}\u{43c}.", 429);
 }
@@ -60,6 +73,7 @@ if (!crm_yookassa_ready()) {
 }
 
 $clientId = capi_find_or_create_client($pdo, $name, $phoneDigits);
+capi_record_consent($pdo, $clientId, 'site_order_online', $payload);
 $declaredValue = !empty($addons['insure_value']) ? (float) $addons['insure_value'] : null;
 $isInsured = $declaredValue !== null && $declaredValue > 0;
 $insuranceFee = $isInsured ? (float) ($totals['insure'] ?? 0) : null;
@@ -69,6 +83,18 @@ $insuranceFee = $isInsured ? (float) ($totals['insure'] ?? 0) : null;
     $weight, $declaredValue, $totals['total'], $comment, 'site', null,
     $isInsured, $declaredValue, $insuranceFee
 );
+
+if ($promo !== null) {
+    if (crm_promo_consume($pdo, (int) $promo['id'])) {
+        $pdo->prepare('UPDATE orders SET promo_code = ?, discount_amount = ? WHERE id = ?')
+            ->execute([$promo['code'], $discount, $orderId]);
+    } else {
+        // Лимит промокода исчерпан в эту же секунду другим заказом — без скидки.
+        $totals['total'] = round((float) $totals['total'] + $discount, 2);
+        $pdo->prepare('UPDATE orders SET price = ? WHERE id = ?')->execute([$totals['total'], $orderId]);
+        $discount = 0.0;
+    }
+}
 
 $cfg = crm_config();
 $baseUrl = rtrim($cfg['site']['base_url'] ?? '', '/');

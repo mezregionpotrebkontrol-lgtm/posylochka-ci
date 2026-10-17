@@ -49,14 +49,25 @@ if ($typeFilter !== '') {
     $where[] = 'client_type = ?';
     $params[] = $typeFilter;
 }
-$sql = 'SELECT * FROM clients';
-if ($where) {
-    $sql .= ' WHERE ' . implode(' AND ', $where);
-}
-$sql .= ' ORDER BY created_at DESC LIMIT 200';
+$whereSql = $where ? ' WHERE ' . implode(' AND ', $where) : '';
+$pg = crm_paginate($pdo, 'SELECT COUNT(*) FROM clients' . $whereSql, $params);
+$sql = 'SELECT * FROM clients' . $whereSql . ' ORDER BY created_at DESC' . crm_limit_sql($pg);
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $clients = $stmt->fetchAll();
+
+if (crm_is_export()) {
+    $rows = [];
+    foreach ($clients as $c) {
+        $rows[] = [
+            $c['id'], $c['name'], crm_client_type_label($c['client_type'] ?? 'individual'), $c['phone'], $c['email'],
+            $c['address'], $c['inn'], $c['kpp'], $c['contact_person'],
+            !empty($c['pd_consent_at']) ? crm_date($c['pd_consent_at']) : '',
+            crm_date($c['created_at'], 'd.m.Y'), $c['notes'],
+        ];
+    }
+    crm_csv_download('klienty', ['№', 'Имя / название', 'Тип', 'Телефон', 'Email', 'Адрес', 'ИНН', 'КПП', 'Контактное лицо', 'Согласие на ПДн', 'Добавлен', 'Заметки'], $rows);
+}
 
 $pageTitle = 'Клиенты';
 $activeNav = 'clients';
@@ -79,6 +90,7 @@ require __DIR__ . '/includes/layout_top.php';
     </div>
     <button class="btn secondary" type="submit">Найти</button>
     <?php if ($search !== '' || $typeFilter !== ''): ?><a class="btn secondary" href="/crm/clients.php">Сбросить</a><?php endif; ?>
+    <span style="margin-left:auto;"><?= crm_export_button() ?></span>
   </form>
 </div>
 
@@ -136,6 +148,7 @@ require __DIR__ . '/includes/layout_top.php';
       <?php endforeach; ?>
     </tbody>
   </table>
+  <?= crm_pagination_html($pg) ?>
   <?php endif; ?>
 </div>
 

@@ -31,18 +31,39 @@ if ($search !== '') {
     $params[] = ctype_digit($search) ? (int) $search : 0;
 }
 
-$sql = 'SELECT o.*, c.name AS client_name, c.phone AS client_phone, u.name AS courier_name
-        FROM orders o
+$fromSql = ' FROM orders o
         JOIN clients c ON c.id = o.client_id
         LEFT JOIN users u ON u.id = o.courier_id';
-if ($where) {
-    $sql .= ' WHERE ' . implode(' AND ', $where);
-}
-$sql .= ' ORDER BY o.created_at DESC LIMIT 300';
+$whereSql = $where ? ' WHERE ' . implode(' AND ', $where) : '';
+$pg = crm_paginate($pdo, 'SELECT COUNT(*)' . $fromSql . $whereSql, $params);
+$sql = 'SELECT o.*, c.name AS client_name, c.phone AS client_phone, u.name AS courier_name'
+    . $fromSql . $whereSql . ' ORDER BY o.created_at DESC' . crm_limit_sql($pg);
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $orders = $stmt->fetchAll();
+
+if (crm_is_export()) {
+    $rows = [];
+    foreach ($orders as $o) {
+        $rows[] = [
+            $o['id'], $o['track_code'] ?? '', crm_date($o['created_at'], 'd.m.Y H:i'),
+            $o['client_name'], $o['client_phone'], $o['from_city'], $o['to_city'], $o['to_address'],
+            $o['recipient_name'] ?? '', $o['recipient_phone'] ?? '',
+            crm_order_status_label($o['status']), crm_pickup_type_label($o['pickup_type'] ?? 'self'), $o['courier_name'],
+            crm_csv_num($o['weight_kg']), $o['places_count'], crm_csv_num($o['price']),
+            $o['promo_code'] ?? '', crm_csv_num($o['discount_amount'] ?? null),
+            crm_payment_status_label($o['payment_status']), crm_payment_method_label($o['payment_method']),
+            $o['is_cod'] ? crm_csv_num($o['cod_amount']) : '', $o['is_insured'] ? crm_csv_num($o['insured_amount']) : '',
+            crm_date($o['planned_date'], 'd.m.Y'), $o['comment'],
+        ];
+    }
+    crm_csv_download('zayavki', [
+        '№', 'Трек', 'Создана', 'Клиент', 'Телефон', 'Откуда', 'Куда', 'Адрес доставки', 'Получатель', 'Тел. получателя',
+        'Статус', 'Получение груза', 'Курьер', 'Вес, кг', 'Мест', 'Сумма, ₽', 'Промокод', 'Скидка, ₽',
+        'Оплата', 'Способ оплаты', 'Наложенный платёж, ₽', 'Страховая сумма, ₽', 'Плановая дата', 'Комментарий',
+    ], $rows);
+}
 
 $couriers = $pdo->query("SELECT id, name FROM users WHERE role = 'courier' AND active = 1 ORDER BY name")->fetchAll();
 
@@ -86,7 +107,8 @@ require __DIR__ . '/includes/layout_top.php';
     <button class="btn secondary" type="submit">&#x41f;&#x440;&#x438;&#x43c;&#x435;&#x43d;&#x438;&#x442;&#x44c;</button>
     <a class="btn secondary" href="/crm/orders.php">&#x421;&#x431;&#x440;&#x43e;&#x441;&#x438;&#x442;&#x44c;</a>
     <a class="btn secondary" href="/crm/orders.php?pickup=courier">&#x412;&#x44b;&#x435;&#x437;&#x434;&#x43d;&#x43e;&#x439; &#x430;&#x432;&#x442;&#x43e;&#x441;&#x431;&#x43e;&#x440;</a>
-    <a class="btn" href="/crm/order.php" style="margin-left:auto;">+ &#x41d;&#x43e;&#x432;&#x430;&#x44f; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x430;</a>
+    <span style="margin-left:auto;display:flex;gap:8px;"><?= crm_export_button() ?>
+    <a class="btn" href="/crm/order.php">+ &#x41d;&#x43e;&#x432;&#x430;&#x44f; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x430;</a></span>
   </form>
 </div>
 
@@ -121,6 +143,7 @@ require __DIR__ . '/includes/layout_top.php';
       <?php endforeach; ?>
     </tbody>
   </table>
+  <?= crm_pagination_html($pg) ?>
   <?php endif; ?>
 </div>
 

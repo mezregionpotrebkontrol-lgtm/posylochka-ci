@@ -8,6 +8,9 @@ require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/max.php';
 require_once __DIR__ . '/email.php';
+require_once __DIR__ . '/audit.php';
+require_once __DIR__ . '/listing.php';
+require_once __DIR__ . '/promo.php';
 
 $crmConfig = crm_config();
 date_default_timezone_set($crmConfig['timezone'] ?? 'Europe/Moscow');

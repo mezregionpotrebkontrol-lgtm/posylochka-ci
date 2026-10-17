@@ -11,6 +11,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 }
 
 $payload = capi_json_input();
+capi_consent_gate($payload);
 $service = trim((string) ($payload['service'] ?? ''));
 $name = trim((string) ($payload['name'] ?? ''));
 $phoneDigits = crm_phone_digits($payload['phone'] ?? null);
@@ -37,6 +38,7 @@ if ($weightRaw !== '' && preg_match('/[\d.,]+/', $weightRaw, $m)) {
 }
 
 $clientId = capi_find_or_create_client($pdo, $name, $phoneDigits);
+capi_record_consent($pdo, $clientId, 'site_shipment', $payload);
 [$orderId, $trackCode] = capi_create_order_row(
     $pdo, $clientId, $originCity, $destCity, $address ?: null,
     $weightKg, null, null, $comment !== '' ? $comment : null, 'site', $service

@@ -174,6 +174,40 @@ if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') 
 }
 
 // &#x41e;&#x442;&#x43c;&#x435;&#x442;&#x43a;&#x430; &#x43e;&#x43f;&#x43b;&#x430;&#x442;&#x44b; &#x43f;&#x440;&#x44f;&#x43c;&#x43e; &#x438;&#x437; &#x437;&#x430;&#x44f;&#x432;&#x43a;&#x438;
+// Промокод / скидка по заявке (миграция 013)
+if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'apply_promo') {
+    crm_csrf_check();
+    if (!empty($order['promo_code'])) {
+        crm_flash_set('К заявке уже применён промокод ' . $order['promo_code'] . '. Сначала уберите его.', 'err');
+    } elseif ($order['payment_status'] === 'paid') {
+        crm_flash_set('Заявка уже оплачена — скидку применить нельзя.', 'err');
+    } else {
+        $price = (float) ($order['price'] ?? 0);
+        [$promo, $discount, $err] = crm_promo_check($pdo, $_POST['promo_code'] ?? '', $price);
+        if ($err !== null) {
+            crm_flash_set($err, 'err');
+        } elseif (!crm_promo_consume($pdo, (int) $promo['id'])) {
+            crm_flash_set('Лимит использований промокода исчерпан.', 'err');
+        } else {
+            $pdo->prepare('UPDATE orders SET price = ?, promo_code = ?, discount_amount = ? WHERE id = ?')
+                ->execute([round($price - $discount, 2), $promo['code'], $discount, $id]);
+            crm_flash_set('Промокод ' . $promo['code'] . ' применён: скидка ' . crm_money($discount) . '.');
+        }
+    }
+    crm_redirect('/crm/order.php?id=' . $id);
+}
+
+if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'remove_promo') {
+    crm_csrf_check();
+    if (!empty($order['promo_code']) && $order['payment_status'] !== 'paid') {
+        $restored = round((float) ($order['price'] ?? 0) + (float) ($order['discount_amount'] ?? 0), 2);
+        $pdo->prepare('UPDATE orders SET price = ?, promo_code = NULL, discount_amount = NULL WHERE id = ?')->execute([$restored, $id]);
+        crm_promo_release($pdo, $order['promo_code']);
+        crm_flash_set('Промокод убран, цена восстановлена: ' . crm_money($restored) . '.');
+    }
+    crm_redirect('/crm/order.php?id=' . $id);
+}
+
 if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'mark_paid') {
     crm_csrf_check();
     $allowedMethods = ['online', 'cash', 'terminal', 'invoice'];
@@ -228,7 +262,7 @@ if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') 
     } elseif (!crm_yookassa_ready()) {
         crm_flash_set("\u{41e}\u{43d}\u{43b}\u{430}\u{439}\u{43d}-\u{43e}\u{43f}\u{43b}\u{430}\u{442}\u{430} \u{43d}\u{435} \u{43d}\u{430}\u{441}\u{442}\u{440}\u{43e}\u{435}\u{43d}\u{430} \u{432} config.php (\u{44e}Kassa).", 'err');
     } else {
-        $clStmt = $pdo->prepare('SELECT name, phone FROM clients WHERE id = ?');
+        $clStmt = $pdo->prepare('SELECT name, phone, email FROM clients WHERE id = ?');
         $clStmt->execute([$order['client_id']]);
         $client = $clStmt->fetch();
         $cfg = crm_config();
@@ -240,7 +274,8 @@ if ($order && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') 
             "\u{417}\u{430}\u{44f}\u{432}\u{43a}\u{430} \u{2116}{$id} (\u{43d}\u{430}\u{43b}\u{43e}\u{436}\u{435}\u{43d}\u{43d}\u{44b}\u{439} \u{43f}\u{43b}\u{430}\u{442}\u{451}\u{436})",
             $returnUrl,
             ['order_id' => $id, 'cod' => 1],
-            $phoneDigits ? '+' . $phoneDigits : null
+            $phoneDigits ? '+' . $phoneDigits : null,
+            ($client && !empty($client['email'])) ? $client['email'] : null
         );
         if ($err !== null || empty($payment['id']) || empty($payment['confirmation']['confirmation_url'])) {
             crm_flash_set($err ?: "\u{41d}\u{435} \u{443}\u{434}\u{430}\u{43b}\u{43e}\u{441}\u{44c} \u{441}\u{43e}\u{437}\u{434}\u{430}\u{442}\u{44c} \u{43f}\u{43b}\u{430}\u{442}\u{451}\u{436}.", 'err');
@@ -497,6 +532,38 @@ require __DIR__ . '/includes/layout_top.php';
     </div>
   </div>
 </div>
+
+<?php if (array_key_exists('promo_code', $order)): ?>
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+    <div>
+      <strong>Скидка / промокод:</strong>
+      <?php if (!empty($order['promo_code'])): ?>
+        <span class="badge badge-green"><?= e($order['promo_code']) ?></span>
+        скидка <?= crm_money((float) $order['discount_amount']) ?>, к оплате <?= crm_money($order['price'] !== null ? (float) $order['price'] : null) ?>
+      <?php else: ?>
+        <span class="text-muted">не применялись</span>
+      <?php endif; ?>
+    </div>
+    <?php if ($order['payment_status'] !== 'paid'): ?>
+      <?php if (!empty($order['promo_code'])): ?>
+        <form method="post" class="inline">
+          <?= crm_csrf_field() ?>
+          <input type="hidden" name="action" value="remove_promo">
+          <button class="btn small secondary" type="submit">Убрать промокод</button>
+        </form>
+      <?php else: ?>
+        <form method="post" class="inline" style="display:flex;gap:6px;align-items:center;">
+          <?= crm_csrf_field() ?>
+          <input type="hidden" name="action" value="apply_promo">
+          <input type="text" name="promo_code" placeholder="ПРОМОКОД" required style="max-width:160px;text-transform:uppercase;">
+          <button class="btn small secondary" type="submit">Применить</button>
+        </form>
+      <?php endif; ?>
+    <?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
 
 <div class="card">
   <h3 style="margin-top:0;">&#x420;&#x430;&#x441;&#x441;&#x440;&#x43e;&#x447;&#x43a;&#x430; &#x2014; &#x433;&#x440;&#x430;&#x444;&#x438;&#x43a; &#x43f;&#x43b;&#x430;&#x442;&#x435;&#x436;&#x435;&#x439;</h3>

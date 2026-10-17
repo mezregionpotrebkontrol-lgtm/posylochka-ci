@@ -38,6 +38,9 @@ $companyName = crm_config()['company_name'] ?? "\u{41f}\u{43e}\u{441}\u{44b}\u{4
       <?php if ($user['role'] === 'admin'): ?>
         <a href="/crm/pricing.php" class="<?= ($activeNav ?? '') === 'pricing' ? 'active' : '' ?>">&#x426;&#x435;&#x43d;&#x44b;</a>
         <a href="/crm/users.php" class="<?= ($activeNav ?? '') === 'users' ? 'active' : '' ?>">&#x421;&#x43e;&#x442;&#x440;&#x443;&#x434;&#x43d;&#x438;&#x43a;&#x438;</a>
+        <a href="/crm/promo.php" class="<?= ($activeNav ?? '') === 'promo' ? 'active' : '' ?>">Промокоды</a>
+        <a href="/crm/audit.php" class="<?= ($activeNav ?? '') === 'audit' ? 'active' : '' ?>">Журнал</a>
+        <a href="/crm/backups.php" class="<?= ($activeNav ?? '') === 'backups' ? 'active' : '' ?>">Копии базы</a>
       <?php endif; ?>
       <?php if ($user['role'] === 'courier'): ?>
         <a href="/crm/courier-pickup.php" class="<?= ($activeNav ?? '') === 'courier-pickup' ? 'active' : '' ?>">&#x41f;&#x440;&#x438;&#x43d;&#x44f;&#x442;&#x44c; &#x433;&#x440;&#x443;&#x437;</a>
